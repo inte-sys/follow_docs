@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart'; // Para generar IDs únicos (agrega 'uuid' al pubspec)
-import '../services/ocr_service.dart';
 // Importa el helper y el modelo al inicio del archivo
 import '../services/database_helper.dart';
-import 'package:camera/camera.dart';
 import 'package:image_picker/image_picker.dart'; // <--- PARA LA CÁMARA
 import '../services/ocr_service.dart'; // <--- PARA EL PROCESAMIENTO
 
