@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart'; // Para generar IDs únicos (agrega 'uuid' al p
 import '../services/ocr_service.dart';
 // Importa el helper y el modelo al inicio del archivo
 import '../services/database_helper.dart';
+import 'package:camera/camera.dart';
 
 class AddDocumentScreen extends StatefulWidget {
   const AddDocumentScreen({super.key});
@@ -46,6 +47,17 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
 
   // [cite: 25] Integración con OCR
   Future<void> _scanWithCamera() async {
+    final cameras = await availableCameras();
+    if (cameras.isEmpty) return;
+
+    // Aquí deberías navegar a una vista de cámara o usar un picker
+    // Para el MVP rápido, usaremos image_picker si lo tienes,
+    // o dispara tu lógica de OCRService directamente si ya tienes la ruta.
+
+    // Ejemplo de disparo del servicio una vez tengas la imagen:
+    // final result = await _ocrService.scanDocument(pathRecuperado);
+    // setState(() { ... actualizar campos ... });
+
     // Aquí se llamaría a la cámara y luego al servicio OCR
     // Por ahora, simulamos la respuesta del servicio definido anteriormente
     final result = await _ocrService.scanDocument("path_to_image");
