@@ -122,6 +122,7 @@ class _HomeScreenState extends State<HomeScreen> {
               Navigator.pop(context);
               // Aquí deberías llamar a un diálogo para nombre de carpeta
               _showFolderDialog();
+              _refreshItems();
             },
           ),
           ListTile(

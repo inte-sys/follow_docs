@@ -39,6 +39,7 @@ dependencies:
   intl: ^0.20.2 # Para procesar el formato de fechas
   font_awesome_flutter: ^10.7.0
   uuid: ^4.0.0
+  image_picker: ^1.0.7
 
   # persistencia de datos
   sqflite: ^2.3.3+1
