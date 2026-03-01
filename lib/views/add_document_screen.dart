@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:uuid/uuid.dart'; // Para generar IDs únicos (agrega 'uuid' al pubspec)
 import '../services/ocr_service.dart';
+// Importa el helper y el modelo al inicio del archivo
+import '../services/database_helper.dart';
 
 class AddDocumentScreen extends StatefulWidget {
   const AddDocumentScreen({super.key});
@@ -58,6 +61,36 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
     });
   }
 
+  Future<void> _saveFollowDoc() async {
+    if (_nameController.text.isEmpty || _dateController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text("Por favor, completa el nombre y la fecha")),
+      );
+      return;
+    }
+
+    // Preparar el mapa de datos siguiendo tu modelo de DB
+    final newItem = {
+      'id': const Uuid().v4(),
+      'name': _nameController.text,
+      'type': 'document',
+      'doc_type': _selectedType,
+      'expiration_date': _dateController.text, // Idealmente convertir a ISO8601
+      'reminder_type': 'notification', // Regla: notificación por defecto
+      'reminder_value': 1, // Regla: 1
+      'reminder_unit': 'meses', // Regla: mes antes
+      'is_active': 1,
+    };
+
+    await DatabaseHelper.instance.insertItem(newItem);
+
+    if (mounted) {
+      Navigator.pop(
+          context, true); // Regresar a la Home y avisar que hubo cambios
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -98,7 +131,8 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
             ),
             const SizedBox(height: 20),
             ElevatedButton(
-              onPressed: () {/* Lógica para guardar en BD Local  */},
+              // onPressed: () {/* Lógica para guardar en BD Local  */},
+              onPressed: _saveFollowDoc,
               child: const Text("Guardar Seguimiento"),
             )
           ],

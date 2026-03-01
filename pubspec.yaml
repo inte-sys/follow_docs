@@ -37,6 +37,7 @@ dependencies:
   google_mlkit_text_recognition: ^0.15.1
   camera: ^0.12.0
   intl: ^0.20.2 # Para procesar el formato de fechas
+  uuid: ^4.0.0
 
   # persistencia de datos
   sqflite: ^2.3.3+1

@@ -14,6 +14,33 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isExpiredOpen = true;
   bool _isAllOpen = false;
 
+  List<FollowItem> _items = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshItems();
+  }
+
+  Future<void> _refreshItems() async {
+    final data = await DatabaseHelper.instance.queryAllItems();
+    setState(() {
+      // Convertimos los mapas de la DB a objetos de nuestro modelo
+      _items = data
+          .map((item) => FollowItem(
+                id: item['id'],
+                name: item['name'],
+                type: item['type'] == 'folder'
+                    ? ItemType.folder
+                    : ItemType.document,
+                expirationDate: item['expiration_date'] != null
+                    ? DateFormat('dd/MM/yyyy').parse(item['expiration_date'])
+                    : null,
+              ))
+          .toList();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -72,7 +99,15 @@ class _HomeScreenState extends State<HomeScreen> {
           ListTile(
             leading: const Icon(Icons.create_new_folder),
             title: const Text("Crear Carpeta"),
-            onTap: () {/* Lógica para nombre máx 32 caracteres */},
+            // onTap: () {/* Lógica para nombre máx 32 caracteres */},
+            onTap: () async {
+              Navigator.pop(context); // Cierra el menú inferior
+              final result = await Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const AddDocumentScreen()));
+              if (result == true) {
+                _refreshItems(); // Refresca si se guardó algo
+              }
+            },
           ),
           ListTile(
             leading: const Icon(Icons.description),

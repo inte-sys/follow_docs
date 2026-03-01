@@ -22,7 +22,10 @@ class ItemTile extends StatelessWidget {
         item.name,
         style: TextStyle(
           color: item.isExpired ? Colors.red : null,
-          decoration: item.isExpired ? TextDecoration.lineThrough : null,
+          decoration: item.isExpired
+              ? TextDecoration.lineThrough
+              : null, // Regla de negocio
+          fontWeight: item.isExpired ? FontWeight.bold : FontWeight.normal,
         ),
       ),
       subtitle: item.type == ItemType.document

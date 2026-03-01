@@ -50,7 +50,7 @@ class DatabaseHelper {
 
   Future<List<Map<String, dynamic>>> queryAllItems() async {
     final db = await instance.database;
-    // Ordenar para que las carpetas aparezcan primero [cite: 51]
-    return await db.query('items', orderBy: "type ASC, name ASC");
+    // 'type DESC' pone 'folder' antes que 'document' alfabéticamente
+    return await db.query('items', orderBy: "type DESC, name ASC");
   }
 }
