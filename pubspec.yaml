@@ -38,6 +38,11 @@ dependencies:
   camera: ^0.12.0
   intl: ^0.20.2 # Para procesar el formato de fechas
 
+  # persistencia de datos
+  sqflite: ^2.3.3+1
+  path_provider: ^2.1.2
+  path: ^1.9.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
