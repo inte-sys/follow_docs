@@ -5,14 +5,16 @@ class OCRService {
 
   Future<Map<String, dynamic>> scanDocument(String imagePath) async {
     final inputImage = InputImage.fromFilePath(imagePath);
-    final RecognizedText recognizedText = await _textRecognizer.processImage(inputImage);
-    
+    final RecognizedText recognizedText =
+        await _textRecognizer.processImage(inputImage);
+
     String fullText = recognizedText.text;
     String? suggestedType;
     DateTime? suggestedExpiryDate;
 
     // Identificar tipo de documento
-    if (fullText.contains(RegExp(r'DNI|Cédula|Pasaporte|Licencia', caseSensitive: false))) {
+    if (fullText.contains(
+        RegExp(r'DNI|Cédula|Pasaporte|Licencia', caseSensitive: false))) {
       suggestedType = _inferDocumentType(fullText);
     }
 
@@ -27,16 +29,22 @@ class OCRService {
   }
 
   String? _inferDocumentType(String text) {
-    if (text.contains(RegExp(r'Licencia', caseSensitive: false))) return "Licencia de conducir"; [cite: 21]
-    if (text.contains(RegExp(r'Pasaporte', caseSensitive: false))) return "Pasaporte"; [cite: 21]
-    if (text.contains(RegExp(r'DNI|Cédula', caseSensitive: false))) return "DNI/Cédula"; [cite: 21]
+    if (text.contains(RegExp(r'Licencia', caseSensitive: false))) {
+      return "Licencia de conducir";
+    }
+    if (text.contains(RegExp(r'Pasaporte', caseSensitive: false))) {
+      return "Pasaporte";
+    }
+    if (text.contains(RegExp(r'DNI|Cédula', caseSensitive: false))) {
+      return "DNI/Cédula";
+    }
     return null;
   }
 
   DateTime? _extractExpirationDate(String text) {
-    // Busca patrones comunes de fechas (DD/MM/AAAA o similares) 
-    // cercanos a palabras clave como "Vence" o "Expiración" 
-    final dateRegExp = RegExp(r'(\d{2}/\d{2}/\d{4})'); 
+    // Busca patrones comunes de fechas (DD/MM/AAAA o similares)
+    // cercanos a palabras clave como "Vence" o "Expiración"
+    final dateRegExp = RegExp(r'(\d{2}/\d{2}/\d{4})');
     final match = dateRegExp.firstMatch(text);
     if (match != null) {
       try {

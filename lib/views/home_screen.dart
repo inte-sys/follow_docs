@@ -30,10 +30,11 @@ class _HomeScreenState extends State<HomeScreen> {
           ExpansionPanelList(
             expansionCallback: (index, isExpanded) {
               setState(() {
-                if (index == 0)
+                if (index == 0) {
                   _isExpiredOpen = !isExpanded;
-                else
+                } else {
                   _isAllOpen = !isExpanded;
+                }
               });
             },
             children: [
