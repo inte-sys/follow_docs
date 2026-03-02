@@ -65,6 +65,15 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
       'expiration_date': _dateController.text,
       'is_active': 1,
     });
+    // ... después de insertar en la base de datos ...
+    if (_dateController.text != null && _dateController.text.isNotEmpty) {
+      // expiryDate es el objeto DateTime procesado
+      await NotificationService().scheduleExpirationNotice(
+        id: newItemId,
+        title: _nameController.text,
+        expiryDate: _dateController.text,
+      );
+    }
     if (mounted) Navigator.pop(context, true);
   }
 
