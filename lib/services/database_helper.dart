@@ -1,6 +1,5 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
-// import '../models/item_model.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
@@ -26,12 +25,11 @@ class DatabaseHelper {
   }
 
   Future _createDB(Database db, int version) async {
-    // Tabla para almacenar tanto carpetas como documentos [cite: 36]
     await db.execute('''
       CREATE TABLE items (
         id TEXT PRIMARY KEY,
-        parent_id TEXT, 
-        name TEXT NOT NULL, 
+        parent_id TEXT,
+        name TEXT NOT NULL,
         type TEXT NOT NULL,
         doc_type TEXT,
         expiration_date TEXT,
@@ -50,7 +48,7 @@ class DatabaseHelper {
 
   Future<List<Map<String, dynamic>>> queryAllItems() async {
     final db = await instance.database;
-    // 'type DESC' pone 'folder' antes que 'document' alfabéticamente
+    // Ordenamos carpetas primero
     return await db.query('items', orderBy: "type DESC, name ASC");
   }
 }
