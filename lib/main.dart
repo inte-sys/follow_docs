@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'views/home_screen.dart'; // Importa tu pantalla principal
+import 'services/notification_service.dart';
 
-void main() {
+void main() async {
   // Asegura que los bindings de Flutter estén listos (necesario para SQLite)
   WidgetsFlutterBinding.ensureInitialized();
   await NotificationService().init();

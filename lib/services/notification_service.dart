@@ -1,19 +1,38 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz;
+import 'package:flutter_timezone/flutter_timezone.dart';
+import 'package:flutter/foundation.dart';
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
   factory NotificationService() => _instance;
   NotificationService._internal();
 
-  final FlutterLocalNotificationsPlugin _notifications = FlutterLocalNotificationsPlugin();
+  final FlutterLocalNotificationsPlugin _notifications =
+      FlutterLocalNotificationsPlugin();
 
   Future<void> init() async {
     tz.initializeTimeZones();
-    const AndroidInitializationSettings androidSettings = 
+    // Configura la zona horaria local del dispositivo
+    try {
+      // La versión moderna de flutter_timezone se llama así:
+      final TimezoneInfo timeZoneName =
+          await FlutterTimezone.getLocalTimezone();
+      tz.setLocalLocation(tz.getLocation(timeZoneName as String));
+      debugPrint("Zona horaria configurada: $timeZoneName");
+    } catch (e) {
+      debugPrint("No se pudo configurar la zona horaria local: $e");
+    }
+// Solicitar permiso explícito para Android 13+
+    await _notifications
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
+        ?.requestNotificationsPermission();
+
+    const AndroidInitializationSettings androidSettings =
         AndroidInitializationSettings('@mipmap/ic_launcher');
-    
+
     await _notifications.initialize(
       const InitializationSettings(android: androidSettings),
     );
@@ -24,27 +43,53 @@ class NotificationService {
     required String title,
     required DateTime expiryDate,
   }) async {
-    // Regla de Negocio: 1 mes antes
-    final scheduleDate = expiryDate.subtract(const Duration(days: 30));
+    // 1. Calculamos la fecha ideal (30 días antes del vencimiento)
+    DateTime scheduleDate = expiryDate.subtract(const Duration(days: 30));
 
-    // Si la fecha ya pasó, no programamos nada
-    if (scheduleDate.isBefore(DateTime.now())) return;
+    // 2. Lógica inteligente:
+    // Si la fecha de aviso ya pasó o es hoy, avisamos en 10 segundos
+    if (scheduleDate.isBefore(DateTime.now())) {
+      scheduleDate = DateTime.now().add(const Duration(seconds: 10));
+    }
 
-    await _notifications.zonedSchedule(
-      id.hashCode,
-      '¡Documento por vencer!',
-      'Tu $title vencerá en 30 días.',
-      tz.TZDateTime.from(scheduleDate, tz.local),
+    try {
+      await _notifications.zonedSchedule(
+        id.hashCode,
+        '¡Recordatorio de Vencimiento!',
+        'Tu documento "$title" vence pronto.',
+        tz.TZDateTime.from(scheduleDate, tz.local),
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'follow_docs_v2', // El canal que ya verificamos que funciona
+            'Alertas de Vencimiento',
+            importance: Importance.max,
+            priority: Priority.high,
+            showWhen: true,
+          ),
+        ),
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle, //
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime, //
+      );
+      debugPrint("Notificación programada con éxito para: $scheduleDate"); //
+    } catch (e) {
+      debugPrint("Error al programar notificación: $e"); //
+    }
+  }
+
+  Future<void> showInstantNotification(String title) async {
+    await _notifications.show(
+      999,
+      'Prueba Inmediata',
+      'Si ves esto, el canal de $title funciona',
       const NotificationDetails(
         android: AndroidNotificationDetails(
-          'follow_docs_id', 'Vencimientos',
+          'follow_docs_v2',
+          'Alertas',
           importance: Importance.max,
           priority: Priority.high,
         ),
       ),
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
     );
   }
 }

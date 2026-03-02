@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/database_helper.dart';
 import '../services/ocr_service.dart';
+import '../services/notification_service.dart';
 
 class AddDocumentScreen extends StatefulWidget {
   const AddDocumentScreen({super.key});
@@ -57,8 +58,9 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
 
   Future<void> _saveFollowDoc() async {
     if (_nameController.text.isEmpty || _dateController.text.isEmpty) return;
+    final String generatedId = const Uuid().v4();
     await DatabaseHelper.instance.insertItem({
-      'id': const Uuid().v4(),
+      'id': generatedId,
       'name': _nameController.text,
       'type': 'document',
       'doc_type': _selectedType,
@@ -66,13 +68,21 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
       'is_active': 1,
     });
     // ... después de insertar en la base de datos ...
-    if (_dateController.text != null && _dateController.text.isNotEmpty) {
-      // expiryDate es el objeto DateTime procesado
-      await NotificationService().scheduleExpirationNotice(
-        id: newItemId,
-        title: _nameController.text,
-        expiryDate: _dateController.text,
-      );
+    if (_dateController.text.isNotEmpty) {
+      try {
+        final DateTime expiry =
+            DateFormat('dd/MM/yyyy').parse(_dateController.text);
+
+        // await NotificationService()
+        // .showInstantNotification("¡Documento agregado!");
+        await NotificationService().scheduleExpirationNotice(
+          id: generatedId, // <--- Ya no es indefinida
+          title: _nameController.text,
+          expiryDate: expiry, // <--- Debe ser DateTime, no String
+        );
+      } catch (e) {
+        debugPrint("Error al programar notificación: $e");
+      }
     }
     if (mounted) Navigator.pop(context, true);
   }
