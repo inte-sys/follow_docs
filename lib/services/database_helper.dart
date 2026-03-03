@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 
@@ -42,13 +43,25 @@ class DatabaseHelper {
   }
 
   Future<int> insertItem(Map<String, dynamic> row) async {
-    final db = await instance.database;
+    Database db = await instance.database;
     return await db.insert('items', row);
   }
 
   Future<List<Map<String, dynamic>>> queryAllItems() async {
-    final db = await instance.database;
+    Database db = await instance.database;
     // Ordenamos carpetas primero
     return await db.query('items', orderBy: "type DESC, name ASC");
+  }
+
+// Añade estos métodos si no los tienes
+  Future<int> updateItem(Map<String, dynamic> row) async {
+    Database db = await instance.database;
+    String id = row['id'];
+    return await db.update('items', row, where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<int> deleteItem(String id) async {
+    Database db = await instance.database;
+    return await db.delete('items', where: 'id = ?', whereArgs: [id]);
   }
 }

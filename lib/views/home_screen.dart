@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../services/database_helper.dart';
 import '../models/item_model.dart';
-import '../widgets/item_tile.dart';
 import 'add_document_screen.dart';
 import 'package:uuid/uuid.dart';
 import 'package:flutter/services.dart';
@@ -16,8 +15,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   List<FollowItem> _items = [];
-  bool _isAllOpen = true;
-  bool _isExpiredOpen = true;
+  List<Map<String, dynamic>> _rawItems = [];
 
   @override
   void initState() {
@@ -28,14 +26,8 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _refreshItems() async {
     final data = await DatabaseHelper.instance.queryAllItems();
 
-    // VOLCADO DE DEBUG: Copia esto de tu consola si falla
-    debugPrint("--- VOLCADO COMPLETO DE BASE DE DATOS ---");
-    for (var row in data) {
-      debugPrint(row.toString());
-    }
-    debugPrint("-----------------------------------------");
-
     setState(() {
+      _rawItems = data;
       _items = data.map((item) {
         DateTime? expiry;
         if (item['expiration_date'] != null &&
@@ -58,18 +50,87 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  void _showFolderDialog() {
-    final TextEditingController folderController = TextEditingController();
+  Widget _buildItemRow(FollowItem item) {
+    final Map<String, dynamic> rawDoc = _rawItems.firstWhere(
+      (element) => element['id'] == item.id,
+      orElse: () => {},
+    );
+
+    return Dismissible(
+      key: Key(item.id),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        color: Colors.red,
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: const Icon(Icons.delete, color: Colors.white),
+      ),
+      confirmDismiss: (direction) async {
+        return await showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text("Confirmar"),
+            content: Text("¿Deseas eliminar '${item.name}'?"),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text("Cancelar"),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child:
+                    const Text("Eliminar", style: TextStyle(color: Colors.red)),
+              ),
+            ],
+          ),
+        );
+      },
+      onDismissed: (direction) async {
+        await DatabaseHelper.instance.deleteItem(item.id);
+        _refreshItems();
+      },
+      child: ListTile(
+        leading: Icon(
+          item.type == ItemType.folder ? Icons.folder : Icons.description,
+          color: item.isExpired ? Colors.red : Colors.blue,
+        ),
+        title: Text(item.name),
+        subtitle: item.expirationDate != null
+            ? Text(
+                "Vence: ${DateFormat('dd/MM/yyyy').format(item.expirationDate!)}")
+            : null,
+        trailing: IconButton(
+          icon: const Icon(Icons.edit),
+          onPressed: () async {
+            if (item.type == ItemType.folder) {
+              _showFolderDialog(existingFolder: rawDoc);
+            } else {
+              final res = await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => AddDocumentScreen(existingDoc: rawDoc),
+                ),
+              );
+              if (res == true) _refreshItems();
+            }
+          },
+        ),
+      ),
+    );
+  }
+
+  void _showFolderDialog({Map<String, dynamic>? existingFolder}) {
+    final TextEditingController folderController = TextEditingController(
+        text: existingFolder != null ? existingFolder['name'] : '');
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text("Nueva Carpeta"),
+        title:
+            Text(existingFolder == null ? "Nueva Carpeta" : "Editar Carpeta"),
         content: TextField(
           controller: folderController,
           maxLength: 32,
-          inputFormatters: [
-            FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9\s\-]'))
-          ],
         ),
         actions: [
           TextButton(
@@ -78,20 +139,47 @@ class _HomeScreenState extends State<HomeScreen> {
           ElevatedButton(
             onPressed: () async {
               if (folderController.text.trim().isNotEmpty) {
-                await DatabaseHelper.instance.insertItem({
-                  'id': const Uuid().v4(),
-                  'name': folderController.text.trim(),
-                  'type': 'folder',
-                  'is_active': 1,
-                });
+                if (existingFolder == null) {
+                  await DatabaseHelper.instance.insertItem({
+                    'id': const Uuid().v4(),
+                    'name': folderController.text.trim(),
+                    'type': 'folder',
+                    'is_active': 1,
+                  });
+                } else {
+                  await DatabaseHelper.instance.updateItem({
+                    'id': existingFolder['id'],
+                    'name': folderController.text.trim(),
+                    'type': 'folder',
+                    'is_active': 1,
+                  });
+                }
                 if (!mounted) return;
                 Navigator.pop(context);
                 _refreshItems();
               }
             },
-            child: const Text("Crear"),
+            child: Text(existingFolder == null ? "Crear" : "Guardar"),
           ),
         ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("Follow Docs")),
+      body: RefreshIndicator(
+        onRefresh: _refreshItems,
+        child: ListView.builder(
+          itemCount: _items.length,
+          itemBuilder: (context, index) => _buildItemRow(_items[index]),
+        ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _showCreateOptions(),
+        child: const Icon(Icons.add),
       ),
     );
   }
@@ -121,63 +209,6 @@ class _HomeScreenState extends State<HomeScreen> {
             },
           ),
         ],
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text("Follow Docs")),
-      body: RefreshIndicator(
-        // Para que puedas arrastrar hacia abajo y refrescar
-        onRefresh: _refreshItems,
-        child: ListView(
-          // Cambiamos SingleChildScrollView por ListView
-          children: [
-            ExpansionPanelList(
-              expansionCallback: (index, isExpanded) {
-                setState(() {
-                  if (index == 0) {
-                    _isExpiredOpen = isExpanded;
-                  } else {
-                    _isAllOpen = isExpanded;
-                  }
-                });
-              },
-              children: [
-                ExpansionPanel(
-                  headerBuilder: (context, isExp) =>
-                      const ListTile(title: Text("Vencidos")),
-                  body: Column(
-                    children: _items
-                        .where((i) => i.isExpired)
-                        .map((item) =>
-                            ItemTile(item: item, onTap: _refreshItems))
-                        .toList(),
-                  ),
-                  isExpanded: _isExpiredOpen,
-                ),
-                ExpansionPanel(
-                  headerBuilder: (context, isExp) =>
-                      const ListTile(title: Text("Todos")),
-                  body: Column(
-                    // <--- CAMBIA ListView.builder por Column aquí
-                    children: _items
-                        .map((item) =>
-                            ItemTile(item: item, onTap: _refreshItems))
-                        .toList(),
-                  ),
-                  isExpanded: _isAllOpen,
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _showCreateOptions,
-        child: const Icon(Icons.add),
       ),
     );
   }

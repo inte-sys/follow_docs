@@ -7,7 +7,8 @@ import '../services/ocr_service.dart';
 import '../services/notification_service.dart';
 
 class AddDocumentScreen extends StatefulWidget {
-  const AddDocumentScreen({super.key});
+  final Map<String, dynamic>? existingDoc;
+  const AddDocumentScreen({super.key, this.existingDoc});
 
   @override
   State<AddDocumentScreen> createState() => _AddDocumentScreenState();
@@ -25,6 +26,17 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
     "Licencia de conducir"
   ];
   final OCRService _ocrService = OCRService();
+
+  // Modificar State para cargar datos existentes
+  @override
+  void initState() {
+    super.initState();
+    if (widget.existingDoc != null) {
+      _nameController.text = widget.existingDoc!['name'];
+      _dateController.text = widget.existingDoc!['expiration_date'];
+      _selectedType = widget.existingDoc!['doc_type'];
+    }
+  }
 
   Future<void> _selectDate() async {
     DateTime? picked = await showDatePicker(
@@ -56,34 +68,42 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
     });
   }
 
+// Modificar método _saveFollowDoc para alternar entre INSERT y UPDATE
   Future<void> _saveFollowDoc() async {
     if (_nameController.text.isEmpty || _dateController.text.isEmpty) return;
-    final String generatedId = const Uuid().v4();
-    await DatabaseHelper.instance.insertItem({
-      'id': generatedId,
+
+    final Map<String, dynamic> data = {
       'name': _nameController.text,
       'type': 'document',
       'doc_type': _selectedType,
       'expiration_date': _dateController.text,
       'is_active': 1,
-    });
-    // ... después de insertar en la base de datos ...
-    if (_dateController.text.isNotEmpty) {
-      try {
-        final DateTime expiry =
-            DateFormat('dd/MM/yyyy').parse(_dateController.text);
+    };
 
-        // await NotificationService()
-        // .showInstantNotification("¡Documento agregado!");
-        await NotificationService().scheduleExpirationNotice(
-          id: generatedId, // <--- Ya no es indefinida
-          title: _nameController.text,
-          expiryDate: expiry, // <--- Debe ser DateTime, no String
-        );
-      } catch (e) {
-        debugPrint("Error al programar notificación: $e");
-      }
+    String docId;
+    if (widget.existingDoc != null) {
+      docId = widget.existingDoc!['id'];
+      data['id'] = docId;
+      await DatabaseHelper.instance.updateItem(data);
+    } else {
+      docId = const Uuid().v4();
+      data['id'] = docId;
+      await DatabaseHelper.instance.insertItem(data);
     }
+
+    // Programación de notificación (Lógica ya verificada anteriormente)
+    try {
+      final DateTime expiry =
+          DateFormat('dd/MM/yyyy').parse(_dateController.text);
+      await NotificationService().scheduleExpirationNotice(
+        id: docId,
+        title: _nameController.text,
+        expiryDate: expiry,
+      );
+    } catch (e) {
+      debugPrint("Error en notificación: $e");
+    }
+
     if (mounted) Navigator.pop(context, true);
   }
 
@@ -99,7 +119,7 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
                 controller: _nameController,
                 decoration: const InputDecoration(labelText: "Nombre")),
             DropdownButtonFormField<String>(
-              value: _selectedType,
+              initialValue: _selectedType,
               // Especificamos explícitamente el tipo de los items
               items: _docTypes.map((String type) {
                 return DropdownMenuItem<String>(

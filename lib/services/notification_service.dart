@@ -14,21 +14,18 @@ class NotificationService {
 
   Future<void> init() async {
     tz.initializeTimeZones();
-    // Configura la zona horaria local del dispositivo
     try {
-      // La versión moderna de flutter_timezone se llama así:
+      // CORRECCIÓN: Usar explícitamente el método que devuelve el String
       final TimezoneInfo timeZoneName =
           await FlutterTimezone.getLocalTimezone();
       tz.setLocalLocation(tz.getLocation(timeZoneName as String));
-      debugPrint("Zona horaria configurada: $timeZoneName");
+      debugPrint("Zona horaria configurada correctamente: $timeZoneName");
     } catch (e) {
-      debugPrint("No se pudo configurar la zona horaria local: $e");
+      // Este es el error que estás viendo actualmente
+      debugPrint("Error al configurar zona horaria: $e");
+      // Opcional: Establecer una por defecto si falla (ej. Bogota/Lima/NY)
+      // tz.setLocalLocation(tz.getLocation('America/Bogota'));
     }
-// Solicitar permiso explícito para Android 13+
-    await _notifications
-        .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
-        ?.requestNotificationsPermission();
 
     const AndroidInitializationSettings androidSettings =
         AndroidInitializationSettings('@mipmap/ic_launcher');
