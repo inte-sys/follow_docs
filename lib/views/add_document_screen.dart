@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
+import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/database_helper.dart';
 import '../services/ocr_service.dart';
@@ -26,6 +27,46 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
     "Licencia de conducir"
   ];
   final OCRService _ocrService = OCRService();
+
+// Ubicación: Dentro de _AddDocumentScreenState
+  void _processImage(InputImage inputImage) async {
+    final textRecognizer = TextRecognizer();
+    final RecognizedText recognizedText =
+        await textRecognizer.processImage(inputImage);
+
+    // Expresión regular para detectar fechas (DD/MM/YYYY o DD-MM-YYYY)
+    final RegExp dateRegExp = RegExp(r'(\d{1,2})[/-](\d{1,2})[/-](\d{4})');
+
+    String? detectedDate;
+    String? detectedName;
+
+    for (TextBlock block in recognizedText.blocks) {
+      for (TextLine line in block.lines) {
+        // 1. Buscar Fechas
+        final match = dateRegExp.firstMatch(line.text);
+        if (match != null && detectedDate == null) {
+          detectedDate =
+              "${match.group(1)}/${match.group(2)}/${match.group(3)}";
+        }
+
+        // 2. Lógica simple para nombre: primera línea larga que no sea fecha
+        if (line.text.length > 10 &&
+            detectedName == null &&
+            !line.text.contains(RegExp(r'\d'))) {
+          detectedName = line.text;
+        }
+      }
+    }
+
+    setState(() {
+      if (detectedDate != null) _dateController.text = detectedDate;
+      if (detectedName != null && _nameController.text.isEmpty) {
+        _nameController.text = detectedName;
+      }
+    });
+
+    textRecognizer.close();
+  }
 
   // Modificar State para cargar datos existentes
   @override
@@ -68,7 +109,7 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
     });
   }
 
-// Modificar método _saveFollowDoc para alternar entre INSERT y UPDATE
+  // Modificar método _saveFollowDoc para alternar entre INSERT y UPDATE
   Future<void> _saveFollowDoc() async {
     if (_nameController.text.isEmpty || _dateController.text.isEmpty) return;
 
