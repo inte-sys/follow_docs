@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import '../services/database_helper.dart';
 import '../services/notification_service.dart';
+import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
 
 class AddDocumentScreen extends StatefulWidget {
   final Map<String, dynamic>? existingDoc;
@@ -28,6 +29,12 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
     'Licencia de conducir',
     'Otro'
   ];
+  // Definir la plantilla
+  final dateMaskFormatter = MaskTextInputFormatter(
+    mask: '##/##/####',
+    filter: {"#": RegExp(r'[0-9]')},
+    type: MaskAutoCompletionType.lazy,
+  );
 
   @override
   void initState() {
@@ -102,8 +109,8 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: DateTime.now(),
-      firstDate:
-          DateTime.now(), // Restricción: No permite seleccionar antes de hoy
+      // Cambiamos firstDate a un año lejano en el pasado
+      firstDate: DateTime(1900),
       lastDate: DateTime(2100),
     );
     if (picked != null) {
@@ -131,20 +138,12 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
     };
 
     try {
-      final DateTime inputDate =
-          DateFormat('dd/MM/yyyy').parse(_dateController.text);
-      if (inputDate
-          .isBefore(DateTime.now().subtract(const Duration(days: 1)))) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content:
-                  Text("Error: La fecha de vencimiento no puede ser pasada")),
-        );
-        return; // Detiene el guardado
-      }
+      // Intentar parsear para validar que sea una fecha real
+      DateFormat('dd/MM/yyyy').parse(_dateController.text);
+      // SE ELIMINÓ LA VALIDACIÓN .isBefore(DateTime.now()) PARA PERMITIR FECHAS PASADAS
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Formato de fecha inválido")),
+        const SnackBar(content: Text("Formato de fecha inválido (DD/MM/YYYY)")),
       );
       return;
     }
@@ -202,9 +201,13 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
                 decoration: const InputDecoration(labelText: 'Nombre')),
             TextField(
               controller: _dateController,
-              keyboardType: TextInputType.datetime,
+              // Despliega solo números en tu Samsung
+              keyboardType: TextInputType.number,
+              // Aplica la plantilla de autocompletado de barras /
+              inputFormatters: [dateMaskFormatter],
               decoration: InputDecoration(
                 labelText: 'Vencimiento (DD/MM/YYYY)',
+                hintText: '31/12/2025',
                 suffixIcon: IconButton(
                   icon: const Icon(Icons.calendar_today),
                   onPressed: () => _selectDate(context),
