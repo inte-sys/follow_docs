@@ -106,13 +106,24 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
   }
 
   Future<void> _selectDate(BuildContext context) async {
+    DateTime initialDate = DateTime.now();
+
+    // Si el usuario ya escribió algo válido, el calendario se abre en esa fecha
+    if (_dateController.text.isNotEmpty) {
+      try {
+        initialDate = DateFormat('dd/MM/yyyy').parse(_dateController.text);
+      } catch (e) {
+        initialDate = DateTime.now();
+      }
+    }
+
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: DateTime.now(),
-      // Cambiamos firstDate a un año lejano en el pasado
+      initialDate: initialDate,
       firstDate: DateTime(1900),
       lastDate: DateTime(2100),
     );
+
     if (picked != null) {
       setState(() {
         _dateController.text = DateFormat('dd/MM/yyyy').format(picked);
@@ -201,13 +212,12 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
                 decoration: const InputDecoration(labelText: 'Nombre')),
             TextField(
               controller: _dateController,
-              // Despliega solo números en tu Samsung
               keyboardType: TextInputType.number,
-              // Aplica la plantilla de autocompletado de barras /
               inputFormatters: [dateMaskFormatter],
               decoration: InputDecoration(
                 labelText: 'Vencimiento (DD/MM/YYYY)',
-                hintText: '31/12/2025',
+                // Muestra la fecha de hoy como ejemplo dinámico
+                hintText: DateFormat('dd/MM/yyyy').format(DateTime.now()),
                 suffixIcon: IconButton(
                   icon: const Icon(Icons.calendar_today),
                   onPressed: () => _selectDate(context),
