@@ -98,6 +98,21 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
     textRecognizer.close();
   }
 
+  Future<void> _selectDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate:
+          DateTime.now(), // Restricción: No permite seleccionar antes de hoy
+      lastDate: DateTime(2100),
+    );
+    if (picked != null) {
+      setState(() {
+        _dateController.text = DateFormat('dd/MM/yyyy').format(picked);
+      });
+    }
+  }
+
   Future<void> _saveDoc() async {
     if (_nameController.text.isEmpty || _dateController.text.isEmpty) return;
 
@@ -114,6 +129,25 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
       'expiration_date': _dateController.text,
       'is_active': 1,
     };
+
+    try {
+      final DateTime inputDate =
+          DateFormat('dd/MM/yyyy').parse(_dateController.text);
+      if (inputDate
+          .isBefore(DateTime.now().subtract(const Duration(days: 1)))) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content:
+                  Text("Error: La fecha de vencimiento no puede ser pasada")),
+        );
+        return; // Detiene el guardado
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Formato de fecha inválido")),
+      );
+      return;
+    }
 
     String docId;
     if (widget.existingDoc != null) {
@@ -167,9 +201,16 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
                 controller: _nameController,
                 decoration: const InputDecoration(labelText: 'Nombre')),
             TextField(
-                controller: _dateController,
-                decoration: const InputDecoration(
-                    labelText: 'Vencimiento (DD/MM/YYYY)')),
+              controller: _dateController,
+              keyboardType: TextInputType.datetime,
+              decoration: InputDecoration(
+                labelText: 'Vencimiento (DD/MM/YYYY)',
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.calendar_today),
+                  onPressed: () => _selectDate(context),
+                ),
+              ),
+            ),
             DropdownButton<String>(
               isExpanded: true,
               value: _selectedType,
