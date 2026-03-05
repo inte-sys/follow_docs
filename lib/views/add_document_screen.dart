@@ -28,44 +28,64 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
   ];
   final OCRService _ocrService = OCRService();
 
-// Ubicación: Dentro de _AddDocumentScreenState
   void _processImage(InputImage inputImage) async {
     final textRecognizer = TextRecognizer();
     final RecognizedText recognizedText =
         await textRecognizer.processImage(inputImage);
 
-    // Expresión regular para detectar fechas (DD/MM/YYYY o DD-MM-YYYY)
-    final RegExp dateRegExp = RegExp(r'(\d{1,2})[/-](\d{1,2})[/-](\d{4})');
+    // Patrón que acepta DD/MM/YYYY, DD.MM.YYYY, DD MM YYYY y formatos de 2 dígitos en año
+    final RegExp dateRegExp =
+        RegExp(r'(\d{1,2})[\s\./-](\d{1,2})[\s\./-](\d{2,4})');
 
     String? detectedDate;
     String? detectedName;
 
     for (TextBlock block in recognizedText.blocks) {
       for (TextLine line in block.lines) {
-        // 1. Buscar Fechas
-        final match = dateRegExp.firstMatch(line.text);
-        if (match != null && detectedDate == null) {
-          detectedDate =
-              "${match.group(1)}/${match.group(2)}/${match.group(3)}";
+        String text = line.text.trim();
+
+        // 1. BUSCAR FECHA: Limpiamos ruido visual (ej: "EXP: 12/10/2025" -> "12/10/2025")
+        final match = dateRegExp.firstMatch(text);
+        if (match != null) {
+          String day = match.group(1)!.padLeft(2, '0');
+          String month = match.group(2)!.padLeft(2, '0');
+          String year = match.group(3)!;
+
+          // Convertir años de 2 dígitos (ej: 25 -> 2025)
+          if (year.length == 2) year = "20$year";
+
+          // Validación básica: no asignar fechas imposibles (ej: día > 31)
+          int d = int.parse(day);
+          int m = int.parse(month);
+          if (d > 0 && d <= 31 && m > 0 && m <= 12) {
+            detectedDate = "$day/$month/$year";
+          }
         }
 
-        // 2. Lógica simple para nombre: primera línea larga que no sea fecha
-        if (line.text.length > 10 &&
-            detectedName == null &&
-            !line.text.contains(RegExp(r'\d'))) {
-          detectedName = line.text;
+        // 2. BUSCAR NOMBRE: Si la línea tiene palabras largas y el controlador está vacío
+        if (detectedName == null &&
+            _nameController.text.isEmpty &&
+            text.length > 5 &&
+            !text.contains(RegExp(r'\d'))) {
+          detectedName = text;
         }
       }
     }
 
     setState(() {
-      if (detectedDate != null) _dateController.text = detectedDate;
-      if (detectedName != null && _nameController.text.isEmpty) {
-        _nameController.text = detectedName;
+      if (detectedDate != null) {
+        _dateController.text = detectedDate!;
+      }
+      if (detectedName != null) {
+        _nameController.text = detectedName!;
       }
     });
 
     textRecognizer.close();
+
+    if (detectedDate == null) {
+      debugPrint("OCR: No se detectó una fecha válida.");
+    }
   }
 
   // Modificar State para cargar datos existentes
@@ -107,6 +127,18 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
             DateFormat('dd/MM/yyyy').format(result['expiryDate']);
       }
     });
+  }
+
+  // 1. EL MÉTODO (Asegúrate de que esté así)
+  // Dentro del método build o donde invoques la cámara/galería:
+  Future<void> _pickImage(ImageSource source) async {
+    final picker = ImagePicker();
+    final XFile? image = await picker.pickImage(source: source);
+
+    if (image != null) {
+      final inputImage = InputImage.fromFilePath(image.path);
+      _processImage(inputImage); // Llamada al método actualizado arriba
+    }
   }
 
   // Modificar método _saveFollowDoc para alternar entre INSERT y UPDATE
@@ -151,52 +183,102 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Nuevo Documento")),
+      appBar: AppBar(
+        title: Text(widget.existingDoc == null
+            ? "Nuevo Documento"
+            : "Editar Documento"),
+        actions: [
+          // Botón para abrir la Galería
+          IconButton(
+            icon: const Icon(Icons.photo_library),
+            onPressed: () => _pickImage(ImageSource.gallery),
+            tooltip: "Escanear desde Galería",
+          ),
+          // Botón para abrir la Cámara
+          IconButton(
+            icon: const Icon(Icons.camera_alt),
+            onPressed: () => _pickImage(ImageSource.camera),
+            tooltip: "Escanear con Cámara",
+          ),
+        ],
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            TextField(
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Campo para el nombre del documento
+              TextField(
                 controller: _nameController,
-                decoration: const InputDecoration(labelText: "Nombre")),
-            DropdownButtonFormField<String>(
-              initialValue: _selectedType,
-              // Especificamos explícitamente el tipo de los items
-              items: _docTypes.map((String type) {
-                return DropdownMenuItem<String>(
-                  value: type,
-                  child: Text(type),
-                );
-              }).toList(),
-              onChanged: (String? newValue) {
-                if (newValue != null) {
-                  setState(() {
-                    _selectedType = newValue;
-                  });
-                }
-              },
-              decoration: const InputDecoration(labelText: "Tipo de documento"),
-            ),
-            Row(
-              children: [
-                Expanded(
-                    child: TextField(
-                        controller: _dateController,
-                        decoration:
-                            const InputDecoration(labelText: "Vencimiento"))),
-                IconButton(
-                    icon: const Icon(Icons.calendar_today),
-                    onPressed: _selectDate),
-                IconButton(
-                    icon: const Icon(Icons.camera_alt),
-                    onPressed: _scanWithCamera),
-              ],
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton(
-                onPressed: _saveFollowDoc,
-                child: const Text("Guardar Seguimiento")),
-          ],
+                decoration: const InputDecoration(
+                  labelText: 'Nombre del Documento',
+                  hintText: 'Ej: Pasaporte, Visa, Seguro',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Selector de tipo de documento
+              DropdownButtonFormField<String>(
+                value: _selectedType,
+                items: ['Pasaporte', 'Visa', 'Identificación', 'Otro']
+                    .map((label) => DropdownMenuItem(
+                          value: label,
+                          child: Text(label),
+                        ))
+                    .toList(),
+                onChanged: (value) {
+                  setState(() => _selectedType = value!);
+                },
+                decoration: const InputDecoration(
+                  labelText: 'Tipo',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Campo para la fecha (rellenado automáticamente por OCR)
+              TextField(
+                controller: _dateController,
+                readOnly:
+                    true, // Evita escritura manual para usar el picker o OCR
+                decoration: const InputDecoration(
+                  labelText: 'Fecha de Vencimiento',
+                  hintText: 'DD/MM/YYYY',
+                  prefixIcon: Icon(Icons.calendar_today),
+                  border: OutlineInputBorder(),
+                ),
+                onTap: () async {
+                  // Opción de respaldo: Selector de fecha manual
+                  DateTime? pickedDate = await showDatePicker(
+                    context: context,
+                    initialDate: DateTime.now(),
+                    firstDate: DateTime(2000),
+                    lastDate: DateTime(2100),
+                  );
+                  if (pickedDate != null) {
+                    setState(() {
+                      _dateController.text =
+                          DateFormat('dd/MM/yyyy').format(pickedDate);
+                    });
+                  }
+                },
+              ),
+              const SizedBox(height: 30),
+
+              // Botón de Guardar
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: _saveFollowDoc,
+                  child: Text(
+                      widget.existingDoc == null ? "GUARDAR" : "ACTUALIZAR"),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
