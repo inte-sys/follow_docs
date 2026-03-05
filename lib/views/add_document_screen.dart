@@ -17,8 +17,17 @@ class AddDocumentScreen extends StatefulWidget {
 class _AddDocumentScreenState extends State<AddDocumentScreen> {
   final _nameController = TextEditingController();
   final _dateController = TextEditingController();
+  final _customTypeController = TextEditingController();
   String _selectedType = 'Pasaporte';
-  final List<String> _docTypes = ['Pasaporte', 'Visa', 'DNI', 'Seguro', 'Otro'];
+  final List<String> _docTypes = [
+    'Pasaporte',
+    'Visa',
+    'DNI',
+    'Seguro',
+    'Cédula',
+    'Licencia de conducir',
+    'Otro'
+  ];
 
   @override
   void initState() {
@@ -26,7 +35,17 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
     if (widget.existingDoc != null) {
       _nameController.text = widget.existingDoc!['name'] ?? '';
       _dateController.text = widget.existingDoc!['expiration_date'] ?? '';
-      _selectedType = widget.existingDoc!['doc_type'] ?? 'Pasaporte';
+
+      String savedType = widget.existingDoc!['doc_type'] ?? 'Pasaporte';
+
+      // Si el tipo guardado no está en la lista predefinida, marcamos 'Otro'
+      // y cargamos el valor en el controlador personalizado.
+      if (!_docTypes.contains(savedType)) {
+        _selectedType = 'Otro';
+        _customTypeController.text = savedType;
+      } else {
+        _selectedType = savedType;
+      }
     }
   }
 
@@ -82,10 +101,16 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
   Future<void> _saveDoc() async {
     if (_nameController.text.isEmpty || _dateController.text.isEmpty) return;
 
+    // Si elige 'Otro', usamos el texto del nuevo campo; si no, el del selector.
+    final String finalType = _selectedType == 'Otro'
+        ? _customTypeController.text.trim()
+        : _selectedType;
+
     final data = {
       'name': _nameController.text,
       'type': 'document',
-      'doc_type': _selectedType,
+      'doc_type':
+          finalType.isEmpty ? 'Otro' : finalType, // Evita guardar vacíos
       'expiration_date': _dateController.text,
       'is_active': 1,
     };
@@ -146,12 +171,24 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
                 decoration: const InputDecoration(
                     labelText: 'Vencimiento (DD/MM/YYYY)')),
             DropdownButton<String>(
+              isExpanded: true,
               value: _selectedType,
               items: _docTypes
                   .map((t) => DropdownMenuItem(value: t, child: Text(t)))
                   .toList(),
               onChanged: (val) => setState(() => _selectedType = val!),
             ),
+            if (_selectedType == 'Otro') ...[
+              const SizedBox(height: 10),
+              TextField(
+                controller: _customTypeController,
+                decoration: const InputDecoration(
+                  labelText: 'Especifique el tipo de documento',
+                  hintText: 'Ej: Carnet de Pesca',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
             const SizedBox(height: 20),
             ElevatedButton(onPressed: _saveDoc, child: const Text("Guardar")),
           ],
