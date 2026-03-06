@@ -159,6 +159,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     'name': folderController.text.trim(),
                     'type': 'folder',
                     'is_active': 1,
+                    'parent_id': _currentFolderId,
                   });
                 } else {
                   await DatabaseHelper.instance.updateItem({
@@ -233,8 +234,12 @@ class _HomeScreenState extends State<HomeScreen> {
             title: const Text("Crear Elemento"),
             onTap: () async {
               Navigator.pop(context);
-              final res = await Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => const AddDocumentScreen()));
+              final res = await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => AddDocumentScreen(
+                            parentId: _currentFolderId,
+                          )));
               if (res == true) _refreshItems();
             },
           ),
