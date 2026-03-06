@@ -64,4 +64,15 @@ class DatabaseHelper {
     Database db = await instance.database;
     return await db.delete('items', where: 'id = ?', whereArgs: [id]);
   }
+
+  // Nuevo método para consultar contenido de una carpeta específica
+  Future<List<Map<String, dynamic>>> queryItemsByParent(
+      String? parentId) async {
+    Database db = await instance.database;
+    return await db.query(
+      'items',
+      where: parentId == null ? 'parent_id IS NULL' : 'parent_id = ?',
+      whereArgs: parentId == null ? [] : [parentId],
+    );
+  }
 }

@@ -16,6 +16,8 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   List<FollowItem> _items = [];
   List<Map<String, dynamic>> _rawItems = [];
+  String? _currentFolderId;
+  String _currentFolderName = "Follow Docs";
 
   @override
   void initState() {
@@ -24,7 +26,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _refreshItems() async {
-    final data = await DatabaseHelper.instance.queryAllItems();
+    // Modificar _refreshItems para usar el filtro por parent_id
+    final data =
+        await DatabaseHelper.instance.queryItemsByParent(_currentFolderId);
 
     setState(() {
       _rawItems = data;
@@ -115,6 +119,16 @@ class _HomeScreenState extends State<HomeScreen> {
             }
           },
         ),
+        // Modificar _buildItemRow para manejar el toque en carpetas
+        onTap: () {
+          if (item.type == ItemType.folder) {
+            setState(() {
+              _currentFolderId = item.id;
+              _currentFolderName = item.name;
+            });
+            _refreshItems();
+          }
+        },
       ),
     );
   }
@@ -169,7 +183,23 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Follow Docs")),
+      // appBar: AppBar(title: const Text("Follow Docs")),
+      // añadir botón Volver en AppBar si estamos en una carpeta
+      appBar: AppBar(
+        title: Text(_currentFolderName),
+        leading: _currentFolderId != null
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () {
+                  setState(() {
+                    _currentFolderId = null;
+                    _currentFolderName = "Follow Docs";
+                  });
+                  _refreshItems();
+                },
+              )
+            : null,
+      ),
       body: RefreshIndicator(
         onRefresh: _refreshItems,
         child: ListView.builder(

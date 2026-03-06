@@ -9,7 +9,8 @@ import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
 
 class AddDocumentScreen extends StatefulWidget {
   final Map<String, dynamic>? existingDoc;
-  const AddDocumentScreen({super.key, this.existingDoc});
+  final String? parentId;
+  const AddDocumentScreen({super.key, this.existingDoc, this.parentId});
 
   @override
   State<AddDocumentScreen> createState() => _AddDocumentScreenState();
@@ -134,24 +135,19 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
   Future<void> _saveDoc() async {
     if (_nameController.text.isEmpty || _dateController.text.isEmpty) return;
 
-    // Si elige 'Otro', usamos el texto del nuevo campo; si no, el del selector.
+    // 1. Declarar y asignar docId en una sola instrucción
+    final String docId = widget.existingDoc != null
+        ? widget.existingDoc!['id']
+        : const Uuid().v4();
+
+    // 2. Definir el tipo (lógica de 'Otro')
     final String finalType = _selectedType == 'Otro'
         ? _customTypeController.text.trim()
         : _selectedType;
 
-    final data = {
-      'name': _nameController.text,
-      'type': 'document',
-      'doc_type':
-          finalType.isEmpty ? 'Otro' : finalType, // Evita guardar vacíos
-      'expiration_date': _dateController.text,
-      'is_active': 1,
-    };
-
+    // 3. Validar formato de fecha antes de proceder con la DB
     try {
-      // Intentar parsear para validar que sea una fecha real
       DateFormat('dd/MM/yyyy').parse(_dateController.text);
-      // SE ELIMINÓ LA VALIDACIÓN .isBefore(DateTime.now()) PARA PERMITIR FECHAS PASADAS
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Formato de fecha inválido (DD/MM/YYYY)")),
@@ -159,18 +155,25 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
       return;
     }
 
-    String docId;
+    // 4. Preparar mapa de datos
+    final data = {
+      'id': docId,
+      'name': _nameController.text,
+      'type': 'document',
+      'doc_type': finalType.isEmpty ? 'Otro' : finalType,
+      'expiration_date': _dateController.text,
+      'is_active': 1,
+      'parent_id': widget.parentId,
+    };
+
+    // 5. Persistencia en Base de Datos (IMPORTANTE: Faltaba esta ejecución)
     if (widget.existingDoc != null) {
-      docId = widget.existingDoc!['id'];
-      data['id'] = docId;
       await DatabaseHelper.instance.updateItem(data);
     } else {
-      docId = const Uuid().v4();
-      data['id'] = docId;
       await DatabaseHelper.instance.insertItem(data);
     }
 
-    // Notificación
+    // 6. Programar Notificación
     try {
       final expiry = DateFormat('dd/MM/yyyy').parse(_dateController.text);
       await NotificationService().scheduleExpirationNotice(
