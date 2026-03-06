@@ -16,6 +16,9 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   List<FollowItem> _items = [];
   List<Map<String, dynamic>> _rawItems = [];
+  List<Map<String, String?>> _navigationStack = [
+    {'id': null, 'name': 'Principal'}
+  ];
   String? _currentFolderId;
   String _currentFolderName = "Follow Docs";
 
@@ -25,10 +28,11 @@ class _HomeScreenState extends State<HomeScreen> {
     _refreshItems();
   }
 
+  Map<String, String?> get _currentLevel => _navigationStack.last;
+
   Future<void> _refreshItems() async {
-    // Modificar _refreshItems para usar el filtro por parent_id
     final data =
-        await DatabaseHelper.instance.queryItemsByParent(_currentFolderId);
+        await DatabaseHelper.instance.queryItemsByParent(_currentLevel['id']);
 
     setState(() {
       _rawItems = data;
@@ -123,8 +127,7 @@ class _HomeScreenState extends State<HomeScreen> {
         onTap: () {
           if (item.type == ItemType.folder) {
             setState(() {
-              _currentFolderId = item.id;
-              _currentFolderName = item.name;
+              _navigationStack.add({'id': item.id, 'name': item.name});
             });
             _refreshItems();
           }
@@ -181,45 +184,61 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void _goBack() {
+    if (_navigationStack.length > 1) {
+      setState(() {
+        _navigationStack.removeLast();
+      });
+      _refreshItems();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      // appBar: AppBar(title: const Text("Follow Docs")),
-      // añadir botón Volver en AppBar si estamos en una carpeta
-      appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text("Follow Docs", style: TextStyle(fontSize: 14)),
-            Text(_currentFolderName,
-                style:
-                    const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          ],
+    return PopScope(
+      canPop: _navigationStack.length <= 1, // Si es 1, permite salir de la app
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _goBack(); // Si hay carpetas atrás, retrocede nivel a nivel
+      },
+      child: Scaffold(
+        // appBar: AppBar(title: const Text("Follow Docs")),
+        // añadir botón Volver en AppBar si estamos en una carpeta
+        appBar: AppBar(
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text("Follow Docs", style: TextStyle(fontSize: 14)),
+              Text(_currentFolderName,
+                  style: const TextStyle(
+                      fontSize: 18, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          leading: _currentFolderId != null
+              ? IconButton(
+                  icon: const Icon(Icons.arrow_back_ios_new),
+                  onPressed: () {
+                    setState(() {
+                      _currentFolderId =
+                          null; // En una versión más compleja, aquí iría el ID del padre real
+                      _currentFolderName = "Principal";
+                    });
+                    _refreshItems();
+                  },
+                )
+              : null,
         ),
-        leading: _currentFolderId != null
-            ? IconButton(
-                icon: const Icon(Icons.arrow_back_ios_new),
-                onPressed: () {
-                  setState(() {
-                    _currentFolderId =
-                        null; // En una versión más compleja, aquí iría el ID del padre real
-                    _currentFolderName = "Principal";
-                  });
-                  _refreshItems();
-                },
-              )
-            : null,
-      ),
-      body: RefreshIndicator(
-        onRefresh: _refreshItems,
-        child: ListView.builder(
-          itemCount: _items.length,
-          itemBuilder: (context, index) => _buildItemRow(_items[index]),
+        body: RefreshIndicator(
+          onRefresh: _refreshItems,
+          child: ListView.builder(
+            itemCount: _items.length,
+            itemBuilder: (context, index) => _buildItemRow(_items[index]),
+          ),
         ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showCreateOptions(),
-        child: const Icon(Icons.add),
+        floatingActionButton: FloatingActionButton(
+          onPressed: () => _showCreateOptions(),
+          child: const Icon(Icons.add),
+        ),
       ),
     );
   }
