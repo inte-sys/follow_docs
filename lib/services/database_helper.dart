@@ -69,10 +69,12 @@ class DatabaseHelper {
   Future<List<Map<String, dynamic>>> queryItemsByParent(
       String? parentId) async {
     Database db = await instance.database;
+    // Ordenar por tipo (folders primero) y luego por nombre
     return await db.query(
       'items',
       where: parentId == null ? 'parent_id IS NULL' : 'parent_id = ?',
       whereArgs: parentId == null ? [] : [parentId],
+      orderBy: 'type ASC, name ASC',
     );
   }
 }

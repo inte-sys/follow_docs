@@ -187,14 +187,23 @@ class _HomeScreenState extends State<HomeScreen> {
       // appBar: AppBar(title: const Text("Follow Docs")),
       // añadir botón Volver en AppBar si estamos en una carpeta
       appBar: AppBar(
-        title: Text(_currentFolderName),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text("Follow Docs", style: TextStyle(fontSize: 14)),
+            Text(_currentFolderName,
+                style:
+                    const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          ],
+        ),
         leading: _currentFolderId != null
             ? IconButton(
-                icon: const Icon(Icons.arrow_back),
+                icon: const Icon(Icons.arrow_back_ios_new),
                 onPressed: () {
                   setState(() {
-                    _currentFolderId = null;
-                    _currentFolderName = "Follow Docs";
+                    _currentFolderId =
+                        null; // En una versión más compleja, aquí iría el ID del padre real
+                    _currentFolderName = "Principal";
                   });
                   _refreshItems();
                 },
