@@ -78,22 +78,27 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
-    // Búsqueda global de documentos (ignora carpetas para encontrar archivos)
-    final data = await DatabaseHelper.instance.queryAllItems();
+    // Consulta global para la búsqueda
+    final allData = await DatabaseHelper.instance.queryAllItems();
+
     setState(() {
-      _items = data
+      // IMPORTANTE: Actualizamos _rawItems con los resultados de la búsqueda
+      // para que _buildItemRow encuentre el documento original al editar.
+      _rawItems = allData
           .where((item) =>
               item['type'] == 'document' &&
               item['name']
                   .toString()
                   .toLowerCase()
                   .contains(query.toLowerCase()))
-          .map((item) {
-        // Reutilización de la lógica de mapeo...
+          .toList();
+
+      _items = _rawItems.map((item) {
         DateTime? expiry;
         if (item['expiration_date'] != null) {
           try {
-            expiry = DateFormat('dd/MM/yyyy').parse(item['expiration_date']);
+            expiry = DateFormat('dd/MM/yyyy')
+                .parse(item['expiration_date'].toString());
           } catch (_) {}
         }
         return FollowItem(
@@ -165,7 +170,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 context,
                 MaterialPageRoute(
                   builder: (_) => AddDocumentScreen(
-                      existingDoc: rawDoc, parentId: _currentLevel['id']),
+                    // existingDoc: rawDoc, parentId: _currentLevel['id']),
+                    existingDoc: rawDoc,
+                    // Si estamos buscando, usamos el parent_id real del documento,
+                    // si no, el de la carpeta actual.
+                    parentId: _isSearching
+                        ? rawDoc['parent_id']
+                        : _currentLevel['id'],
+                  ),
                 ),
               );
               if (res == true) _refreshItems();

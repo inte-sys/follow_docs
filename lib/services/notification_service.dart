@@ -30,20 +30,39 @@ class NotificationService {
 
     // Edición 3 - Manejo robusto de la zona horaria para evitar el error de cast
     // Cambia la forma de obtener la zona horaria para evitar el error de cast
+    //    try {
+    //      // Usar .toString() asegura que siempre recibamos un String para tz.getLocation
+    //      // final dynamic locationName = await FlutterTimezone.getLocalTimezone();
+    //      // ignore: unnecessary_nullable_for_final_variable_declarations
+    //      final timezoneInfo = await FlutterTimezone.getLocalTimezone();
+    //      final String locationName =
+    //          timezoneInfo.toString(); // Asegura que sea un String
+    //      // if (locationName != null) {
+    //      tz.setLocalLocation(tz.getLocation(locationName));
+    //      // tz.setLocalLocation(tz.getLocation(locationName.toString()));
+    //      // }
+    //    } catch (e) {
+    //      debugPrint("Fallo zona horaria: $e");
+    //      tz.setLocalLocation(tz.getLocation('America/Bogota')); // Fallback seguro
+    //    }
+
+    // Edicion 4 - Manejo avanzado de la zona horaria con detección de formato y fallback inteligente
     try {
-      // Usar .toString() asegura que siempre recibamos un String para tz.getLocation
-      // final dynamic locationName = await FlutterTimezone.getLocalTimezone();
-      // ignore: unnecessary_nullable_for_final_variable_declarations
-      final timezoneInfo = await FlutterTimezone.getLocalTimezone();
-      final String locationName =
-          timezoneInfo.toString(); // Asegura que sea un String
-      // if (locationName != null) {
+      final dynamic tzRaw = await FlutterTimezone.getLocalTimezone();
+      String locationName;
+
+      // Si devuelve el objeto TimezoneInfo (común en versiones 5.x)
+      if (tzRaw is! String) {
+        locationName = tzRaw.name; // Extrae solo el ID (ej: America/New_York)
+      } else {
+        locationName = tzRaw;
+      }
+
       tz.setLocalLocation(tz.getLocation(locationName));
-      // tz.setLocalLocation(tz.getLocation(locationName.toString()));
-      // }
     } catch (e) {
-      debugPrint("Fallo zona horaria: $e");
-      tz.setLocalLocation(tz.getLocation('America/Bogota')); // Fallback seguro
+      debugPrint("Error crítico TZ: $e");
+      // Fallback manual si el sistema sigue fallando
+      tz.setLocalLocation(tz.getLocation('America/New_York'));
     }
 
     const AndroidInitializationSettings androidSettings =
