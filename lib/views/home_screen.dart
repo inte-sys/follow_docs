@@ -112,86 +112,111 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildItemRow(FollowItem item) {
+    // Buscar el mapa original para tener todos los metadatos (como parent_id y doc_type)
     final Map<String, dynamic> rawDoc = _rawItems.firstWhere(
       (element) => element['id'] == item.id,
       orElse: () => {},
     );
 
-    return Dismissible(
-      key: Key(item.id),
-      direction: DismissDirection.endToStart,
-      background: Container(
-        color: Colors.red,
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        child: const Icon(Icons.delete, color: Colors.white),
-      ),
-      confirmDismiss: (direction) async {
-        return await showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text("Confirmar"),
-            content: Text("¿Deseas eliminar '${item.name}'?"),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text("Cancelar"),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(context, true),
-                child:
-                    const Text("Eliminar", style: TextStyle(color: Colors.red)),
-              ),
-            ],
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      child: Dismissible(
+        key: Key(item.id),
+        direction: DismissDirection.endToStart,
+        background: Container(
+          decoration: BoxDecoration(
+            color: Colors.red.shade400,
+            borderRadius: BorderRadius.circular(12),
           ),
-        );
-      },
-      onDismissed: (direction) async {
-        await DatabaseHelper.instance.deleteItem(item.id);
-        _refreshItems();
-      },
-      child: ListTile(
-        leading: Icon(
-          item.type == ItemType.folder ? Icons.folder : Icons.description,
-          color: item.isExpired ? Colors.red : Colors.blue,
+          alignment: Alignment.centerRight,
+          padding: const EdgeInsets.only(right: 20),
+          child: const Icon(Icons.delete_sweep, color: Colors.white, size: 28),
         ),
-        title: Text(item.name),
-        subtitle: item.expirationDate != null
-            ? Text(
-                "Vence: ${DateFormat('dd/MM/yyyy').format(item.expirationDate!)}")
-            : null,
-        trailing: IconButton(
-          icon: const Icon(Icons.edit),
-          onPressed: () async {
-            if (item.type == ItemType.folder) {
-              _showFolderDialog(existingFolder: rawDoc);
-            } else {
-              final res = await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => AddDocumentScreen(
-                    // existingDoc: rawDoc, parentId: _currentLevel['id']),
-                    existingDoc: rawDoc,
-                    // Si estamos buscando, usamos el parent_id real del documento,
-                    // si no, el de la carpeta actual.
-                    parentId: _isSearching
-                        ? rawDoc['parent_id']
-                        : _currentLevel['id'],
-                  ),
+        confirmDismiss: (direction) async {
+          return await showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text("Confirmar"),
+              content: Text("¿Deseas eliminar '${item.name}'?"),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text("Cancelar"),
                 ),
-              );
-              if (res == true) _refreshItems();
-            }
-          },
-        ),
-        onTap: () {
-          if (item.type == ItemType.folder) {
-            setState(() {
-              _navigationStack.add({'id': item.id, 'name': item.name});
-            });
-            _refreshItems();
-          }
+                TextButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  child: const Text("Eliminar",
+                      style: TextStyle(color: Colors.red)),
+                ),
+              ],
+            ),
+          );
         },
+        onDismissed: (direction) async {
+          await DatabaseHelper.instance.deleteItem(item.id);
+          _refreshItems();
+        },
+        child: Card(
+          child: ListTile(
+            leading: CircleAvatar(
+              backgroundColor: item.type == ItemType.folder
+                  ? Colors.amber.shade100
+                  : (item.isExpired
+                      ? Colors.red.shade100
+                      : Colors.blue.shade100),
+              child: Icon(
+                item.type == ItemType.folder ? Icons.folder : Icons.description,
+                color: item.type == ItemType.folder
+                    ? Colors.amber.shade800
+                    : (item.isExpired
+                        ? Colors.red.shade800
+                        : Colors.blue.shade800),
+              ),
+            ),
+            title: Text(item.name,
+                style: const TextStyle(fontWeight: FontWeight.w600)),
+            subtitle: item.expirationDate != null
+                ? Text(
+                    "Vence: ${DateFormat('dd/MM/yyyy').format(item.expirationDate!)}",
+                    style: TextStyle(
+                      color: item.isExpired ? Colors.red : Colors.grey.shade600,
+                      fontWeight:
+                          item.isExpired ? FontWeight.bold : FontWeight.normal,
+                    ),
+                  )
+                : const Text("Carpeta de archivos"),
+            trailing: IconButton(
+              icon: const Icon(Icons.edit_note),
+              onPressed: () async {
+                if (item.type == ItemType.folder) {
+                  _showFolderDialog(existingFolder: rawDoc);
+                } else {
+                  final res = await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => AddDocumentScreen(
+                        existingDoc: rawDoc,
+                        // Mantiene el parentId original incluso si editamos desde una búsqueda global
+                        parentId: _isSearching
+                            ? rawDoc['parent_id']
+                            : _currentLevel['id'],
+                      ),
+                    ),
+                  );
+                  if (res == true) _refreshItems();
+                }
+              },
+            ),
+            onTap: () {
+              if (item.type == ItemType.folder) {
+                setState(() {
+                  _navigationStack.add({'id': item.id, 'name': item.name});
+                });
+                _refreshItems();
+              }
+            },
+          ),
+        ),
       ),
     );
   }

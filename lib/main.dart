@@ -18,10 +18,34 @@ class FollowDocsApp extends StatelessWidget {
       title: 'Follow Docs',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
         useMaterial3: true,
+        // Paleta de colores: Azul Profundo y detalles en Cian
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF1A237E),
+          primary: const Color(0xFF1A237E),
+          secondary: const Color(0xFF00B8D4),
+          surface: const Color(0xFFF5F5F5),
+        ),
+        // Estilo de la AppBar
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color(0xFF1A237E),
+          foregroundColor: Colors.white,
+          elevation: 0,
+          centerTitle: false,
+        ),
+        // Estilo de las tarjetas (Card)
+        cardTheme: CardTheme(
+          elevation: 2,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+        // Estilo del botón flotante
+        floatingActionButtonTheme: const FloatingActionButtonThemeData(
+          backgroundColor: Color(0xFF00B8D4),
+          foregroundColor: Colors.white,
+        ),
       ),
-      home: const HomeScreen(), // <--- Aquí llamamos a tu pantalla
+      home: const HomeScreen(),
     );
   }
 }
