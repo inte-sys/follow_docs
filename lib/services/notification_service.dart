@@ -32,8 +32,15 @@ class NotificationService {
     // Cambia la forma de obtener la zona horaria para evitar el error de cast
     try {
       // Usar .toString() asegura que siempre recibamos un String para tz.getLocation
-      final dynamic locationName = await FlutterTimezone.getLocalTimezone();
-      tz.setLocalLocation(tz.getLocation(locationName.toString()));
+      // final dynamic locationName = await FlutterTimezone.getLocalTimezone();
+      // ignore: unnecessary_nullable_for_final_variable_declarations
+      final timezoneInfo = await FlutterTimezone.getLocalTimezone();
+      final String locationName =
+          timezoneInfo.toString(); // Asegura que sea un String
+      // if (locationName != null) {
+      tz.setLocalLocation(tz.getLocation(locationName));
+      // tz.setLocalLocation(tz.getLocation(locationName.toString()));
+      // }
     } catch (e) {
       debugPrint("Fallo zona horaria: $e");
       tz.setLocalLocation(tz.getLocation('America/Bogota')); // Fallback seguro

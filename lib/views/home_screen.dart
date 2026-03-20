@@ -16,11 +16,14 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   List<FollowItem> _items = [];
   List<Map<String, dynamic>> _rawItems = [];
-  List<Map<String, String?>> _navigationStack = [
+
+  // Pila de navegación para gestionar niveles de carpetas y títulos
+  final List<Map<String, String?>> _navigationStack = [
     {'id': null, 'name': 'Principal'}
   ];
-  String? _currentFolderId;
-  String _currentFolderName = "Follow Docs";
+
+  final _searchController = TextEditingController();
+  bool _isSearching = false;
 
   @override
   void initState() {
@@ -28,9 +31,11 @@ class _HomeScreenState extends State<HomeScreen> {
     _refreshItems();
   }
 
+  // Getter para obtener el nivel actual de la pila
   Map<String, String?> get _currentLevel => _navigationStack.last;
 
   Future<void> _refreshItems() async {
+    // Consulta basada en el ID del nivel actual de la pila
     final data =
         await DatabaseHelper.instance.queryItemsByParent(_currentLevel['id']);
 
@@ -52,6 +57,49 @@ class _HomeScreenState extends State<HomeScreen> {
           id: item['id']?.toString() ?? '',
           name: item['name']?.toString() ?? 'Sin nombre',
           type: item['type'] == 'folder' ? ItemType.folder : ItemType.document,
+          expirationDate: expiry,
+        );
+      }).toList();
+    });
+  }
+
+  void _goBack() {
+    if (_navigationStack.length > 1) {
+      setState(() {
+        _navigationStack.removeLast();
+      });
+      _refreshItems();
+    }
+  }
+
+  Future<void> _searchDocuments(String query) async {
+    if (query.isEmpty) {
+      _refreshItems();
+      return;
+    }
+
+    // Búsqueda global de documentos (ignora carpetas para encontrar archivos)
+    final data = await DatabaseHelper.instance.queryAllItems();
+    setState(() {
+      _items = data
+          .where((item) =>
+              item['type'] == 'document' &&
+              item['name']
+                  .toString()
+                  .toLowerCase()
+                  .contains(query.toLowerCase()))
+          .map((item) {
+        // Reutilización de la lógica de mapeo...
+        DateTime? expiry;
+        if (item['expiration_date'] != null) {
+          try {
+            expiry = DateFormat('dd/MM/yyyy').parse(item['expiration_date']);
+          } catch (_) {}
+        }
+        return FollowItem(
+          id: item['id'].toString(),
+          name: item['name'].toString(),
+          type: ItemType.document,
           expirationDate: expiry,
         );
       }).toList();
@@ -116,14 +164,14 @@ class _HomeScreenState extends State<HomeScreen> {
               final res = await Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => AddDocumentScreen(existingDoc: rawDoc),
+                  builder: (_) => AddDocumentScreen(
+                      existingDoc: rawDoc, parentId: _currentLevel['id']),
                 ),
               );
               if (res == true) _refreshItems();
             }
           },
         ),
-        // Modificar _buildItemRow para manejar el toque en carpetas
         onTap: () {
           if (item.type == ItemType.folder) {
             setState(() {
@@ -139,7 +187,6 @@ class _HomeScreenState extends State<HomeScreen> {
   void _showFolderDialog({Map<String, dynamic>? existingFolder}) {
     final TextEditingController folderController = TextEditingController(
         text: existingFolder != null ? existingFolder['name'] : '');
-
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -162,7 +209,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     'name': folderController.text.trim(),
                     'type': 'folder',
                     'is_active': 1,
-                    'parent_id': _currentFolderId,
+                    'parent_id': _currentLevel['id'],
                   });
                 } else {
                   await DatabaseHelper.instance.updateItem({
@@ -180,65 +227,6 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Text(existingFolder == null ? "Crear" : "Guardar"),
           ),
         ],
-      ),
-    );
-  }
-
-  void _goBack() {
-    if (_navigationStack.length > 1) {
-      setState(() {
-        _navigationStack.removeLast();
-      });
-      _refreshItems();
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return PopScope(
-      canPop: _navigationStack.length <= 1, // Si es 1, permite salir de la app
-      onPopInvokedWithResult: (didPop, result) {
-        if (didPop) return;
-        _goBack(); // Si hay carpetas atrás, retrocede nivel a nivel
-      },
-      child: Scaffold(
-        // appBar: AppBar(title: const Text("Follow Docs")),
-        // añadir botón Volver en AppBar si estamos en una carpeta
-        appBar: AppBar(
-          title: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text("Follow Docs", style: TextStyle(fontSize: 14)),
-              Text(_currentFolderName,
-                  style: const TextStyle(
-                      fontSize: 18, fontWeight: FontWeight.bold)),
-            ],
-          ),
-          leading: _currentFolderId != null
-              ? IconButton(
-                  icon: const Icon(Icons.arrow_back_ios_new),
-                  onPressed: () {
-                    setState(() {
-                      _currentFolderId =
-                          null; // En una versión más compleja, aquí iría el ID del padre real
-                      _currentFolderName = "Principal";
-                    });
-                    _refreshItems();
-                  },
-                )
-              : null,
-        ),
-        body: RefreshIndicator(
-          onRefresh: _refreshItems,
-          child: ListView.builder(
-            itemCount: _items.length,
-            itemBuilder: (context, index) => _buildItemRow(_items[index]),
-          ),
-        ),
-        floatingActionButton: FloatingActionButton(
-          onPressed: () => _showCreateOptions(),
-          child: const Icon(Icons.add),
-        ),
       ),
     );
   }
@@ -266,12 +254,76 @@ class _HomeScreenState extends State<HomeScreen> {
                   context,
                   MaterialPageRoute(
                       builder: (_) => AddDocumentScreen(
-                            parentId: _currentFolderId,
+                            parentId: _currentLevel['id'],
                           )));
               if (res == true) _refreshItems();
             },
           ),
         ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: _navigationStack.length <= 1,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _goBack();
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: _isSearching
+              ? TextField(
+                  controller: _searchController,
+                  autofocus: true,
+                  decoration: const InputDecoration(
+                      hintText: "Buscar documento...",
+                      border: InputBorder.none),
+                  onChanged: _searchDocuments,
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text("Follow Docs", style: TextStyle(fontSize: 12)),
+                    Text(_currentLevel['name']!,
+                        style: const TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+          leading: !_isSearching && _navigationStack.length > 1
+              ? IconButton(
+                  icon: const Icon(Icons.arrow_back_ios_new),
+                  onPressed: _goBack,
+                )
+              : null,
+          actions: [
+            IconButton(
+              icon: Icon(_isSearching ? Icons.close : Icons.search),
+              onPressed: () {
+                setState(() {
+                  _isSearching = !_isSearching;
+                  if (!_isSearching) {
+                    _searchController.clear();
+                    _refreshItems();
+                  }
+                });
+              },
+            ),
+          ],
+        ),
+        body: RefreshIndicator(
+          onRefresh: _refreshItems,
+          child: ListView.builder(
+            itemCount: _items.length,
+            itemBuilder: (context, index) => _buildItemRow(_items[index]),
+          ),
+        ),
+        floatingActionButton: FloatingActionButton(
+          onPressed: _showCreateOptions,
+          child: const Icon(Icons.add),
+        ),
       ),
     );
   }
