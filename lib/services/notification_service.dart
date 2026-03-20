@@ -53,7 +53,8 @@ class NotificationService {
 
       // Si devuelve el objeto TimezoneInfo (común en versiones 5.x)
       if (tzRaw is! String) {
-        locationName = tzRaw.name; // Extrae solo el ID (ej: America/New_York)
+        locationName =
+            tzRaw.identifier; // Extrae solo el ID (ej: America/New_York)
       } else {
         locationName = tzRaw;
       }
