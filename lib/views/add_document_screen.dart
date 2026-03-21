@@ -116,7 +116,7 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
-              value: _selectedType,
+              initialValue: _selectedType,
               items: _docTypes
                   .map((t) => DropdownMenuItem(value: t, child: Text(t)))
                   .toList(),

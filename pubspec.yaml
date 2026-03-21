@@ -1,5 +1,5 @@
 name: follow_docs
-description: "A new Flutter project."
+description: "Gestión de documentos con reconocimiento de texto y recordatorios."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -64,6 +64,7 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.13.1
+  sqflite_common_ffi: ^2.3.0+2
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
