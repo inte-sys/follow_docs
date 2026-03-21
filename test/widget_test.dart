@@ -10,7 +10,7 @@ void main() {
   testWidgets('Carga de pantalla principal smoke test',
       (WidgetTester tester) async {
     // Carga la aplicación
-    await tester.pumpWidget(const FollowDocsApp());
+    await tester.pumpWidget(const MyApp());
 
     // Verifica que el título de la aplicación o un texto base aparezca
     expect(find.text('Follow Docs'), findsOneWidget);

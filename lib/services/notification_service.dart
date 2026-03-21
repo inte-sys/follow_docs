@@ -13,65 +13,40 @@ class NotificationService {
       FlutterLocalNotificationsPlugin();
 
   Future<void> init() async {
-    tz.initializeTimeZones();
-    // Edición 2 - Intento de corrección del error de cast en la zona horaria
-    // try {
-    //   // CORRECCIÓN: Usar explícitamente el método que devuelve el String
-    //   final TimezoneInfo timeZoneName =
-    //       await FlutterTimezone.getLocalTimezone();
-    //   tz.setLocalLocation(tz.getLocation(timeZoneName as String));
-    //   debugPrint("Zona horaria configurada correctamente: $timeZoneName");
-    // } catch (e) {
-    //   // Este es el error que estás viendo actualmente
-    //   debugPrint("Error al configurar zona horaria: $e");
-    //   // Opcional: Establecer una por defecto si falla (ej. Bogota/Lima/NY)
-    //   // tz.setLocalLocation(tz.getLocation('America/Bogota'));
-    // }
-
-    // Edición 3 - Manejo robusto de la zona horaria para evitar el error de cast
-    // Cambia la forma de obtener la zona horaria para evitar el error de cast
-    //    try {
-    //      // Usar .toString() asegura que siempre recibamos un String para tz.getLocation
-    //      // final dynamic locationName = await FlutterTimezone.getLocalTimezone();
-    //      // ignore: unnecessary_nullable_for_final_variable_declarations
-    //      final timezoneInfo = await FlutterTimezone.getLocalTimezone();
-    //      final String locationName =
-    //          timezoneInfo.toString(); // Asegura que sea un String
-    //      // if (locationName != null) {
-    //      tz.setLocalLocation(tz.getLocation(locationName));
-    //      // tz.setLocalLocation(tz.getLocation(locationName.toString()));
-    //      // }
-    //    } catch (e) {
-    //      debugPrint("Fallo zona horaria: $e");
-    //      tz.setLocalLocation(tz.getLocation('America/Bogota')); // Fallback seguro
-    //    }
-
-    // Edicion 4 - Manejo avanzado de la zona horaria con detección de formato y fallback inteligente
     try {
-      final dynamic tzRaw = await FlutterTimezone.getLocalTimezone();
-      String locationName;
+      const AndroidInitializationSettings initializationSettingsAndroid =
+          AndroidInitializationSettings('@mipmap/launcher_icon');
 
-      // Si devuelve el objeto TimezoneInfo (común en versiones 5.x)
-      if (tzRaw is! String) {
-        locationName =
-            tzRaw.identifier; // Extrae solo el ID (ej: America/New_York)
-      } else {
-        locationName = tzRaw;
-      }
+      const InitializationSettings initializationSettings =
+          InitializationSettings(android: initializationSettingsAndroid);
 
-      tz.setLocalLocation(tz.getLocation(locationName));
+      await _notifications.initialize(initializationSettings);
+
+      // Configuramos la zona horaria con un timeout de 3 segundos
+      await _configureLocalTimeZone().timeout(
+        const Duration(seconds: 3),
+        onTimeout: () {
+          debugPrint("Timeout configurando zona horaria, usando fallback.");
+          // Fallback manual inmediato si el sistema no responde
+          tz.setLocalLocation(tz.getLocation('America/New_York'));
+        },
+      );
     } catch (e) {
-      debugPrint("Error crítico TZ: $e");
-      // Fallback manual si el sistema sigue fallando
-      tz.setLocalLocation(tz.getLocation('America/New_York'));
+      debugPrint("Error en initNotification: $e");
+      // Aun con error, permitimos que la app continúe
     }
+  }
 
-    const AndroidInitializationSettings androidSettings =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
+  Future<void> _configureLocalTimeZone() async {
+    final dynamic tzRaw = await FlutterTimezone.getLocalTimezone();
+    String locationName;
 
-    await _notifications.initialize(
-      const InitializationSettings(android: androidSettings),
-    );
+    if (tzRaw is! String) {
+      locationName = tzRaw.identifier;
+    } else {
+      locationName = tzRaw;
+    }
+    tz.setLocalLocation(tz.getLocation(locationName));
   }
 
   Future<void> scheduleExpirationNotice({

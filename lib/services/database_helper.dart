@@ -26,20 +26,22 @@ class DatabaseHelper {
   }
 
   Future _createDB(Database db, int version) async {
-    await db.execute('''
-      CREATE TABLE items (
-        id TEXT PRIMARY KEY,
-        parent_id TEXT,
-        name TEXT NOT NULL,
-        type TEXT NOT NULL,
-        doc_type TEXT,
-        expiration_date TEXT,
-        reminder_type TEXT,
-        reminder_value INTEGER,
-        reminder_unit TEXT,
-        is_active INTEGER DEFAULT 1
-      )
-    ''');
+    try {
+      await db.execute('''
+        CREATE TABLE items (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          type TEXT NOT NULL, -- 'folder' o 'document'
+          doc_type TEXT,      -- 'Pasaporte', 'Licencia', etc.
+          expiration_date TEXT,
+          is_active INTEGER DEFAULT 1,
+          parent_id TEXT,
+          FOREIGN KEY (parent_id) REFERENCES items (id) ON DELETE CASCADE
+        )
+      ''');
+    } catch (e) {
+      throw Exception("Error al crear las tablas: $e");
+    }
   }
 
   Future<int> insertItem(Map<String, dynamic> row) async {
