@@ -34,10 +34,11 @@ class FollowDocsApp extends StatelessWidget {
           centerTitle: false,
         ),
         // Estilo de las tarjetas (Card)
-        cardTheme: CardTheme(
+        cardTheme: CardThemeData(
           elevation: 2,
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          margin: const EdgeInsets.symmetric(vertical: 4),
         ),
         // Estilo del botón flotante
         floatingActionButtonTheme: const FloatingActionButtonThemeData(
