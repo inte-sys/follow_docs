@@ -20,6 +20,7 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
   final _nameController = TextEditingController();
   final _dateController = TextEditingController();
   final _customTypeController = TextEditingController();
+  bool _notificationsEnabled = true;
   String _selectedType = 'Pasaporte';
   final List<String> _docTypes = [
     'Pasaporte',
@@ -54,6 +55,7 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
       } else {
         _selectedType = savedType;
       }
+      _notificationsEnabled = widget.existingDoc!['is_active'] == 1;
     }
   }
 
@@ -135,17 +137,14 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
   Future<void> _saveDoc() async {
     if (_nameController.text.isEmpty || _dateController.text.isEmpty) return;
 
-    // 1. Declarar y asignar docId en una sola instrucción
     final String docId = widget.existingDoc != null
         ? widget.existingDoc!['id']
         : const Uuid().v4();
 
-    // 2. Definir el tipo (lógica de 'Otro')
     final String finalType = _selectedType == 'Otro'
         ? _customTypeController.text.trim()
         : _selectedType;
 
-    // 3. Validar formato de fecha antes de proceder con la DB
     try {
       DateFormat('dd/MM/yyyy').parse(_dateController.text);
     } catch (e) {
@@ -155,34 +154,38 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
       return;
     }
 
-    // 4. Preparar mapa de datos
     final data = {
       'id': docId,
       'name': _nameController.text,
       'type': 'document',
       'doc_type': finalType.isEmpty ? 'Otro' : finalType,
       'expiration_date': _dateController.text,
-      'is_active': 1,
+      'is_active':
+          _notificationsEnabled ? 1 : 0, // Guarda la preferencia del usuario
       'parent_id': widget.parentId,
     };
 
-    // 5. Persistencia en Base de Datos (IMPORTANTE: Faltaba esta ejecución)
     if (widget.existingDoc != null) {
       await DatabaseHelper.instance.updateItem(data);
     } else {
       await DatabaseHelper.instance.insertItem(data);
     }
 
-    // 6. Programar Notificación
-    try {
-      final expiry = DateFormat('dd/MM/yyyy').parse(_dateController.text);
-      await NotificationService().scheduleExpirationNotice(
-        id: docId,
-        title: _nameController.text,
-        expiryDate: expiry,
-      );
-    } catch (e) {
-      debugPrint("Error fecha notificación: $e");
+    // Lógica de notificación condicionada al Switch
+    if (_notificationsEnabled) {
+      try {
+        final expiry = DateFormat('dd/MM/yyyy').parse(_dateController.text);
+        await NotificationService().scheduleExpirationNotice(
+          id: docId,
+          title: _nameController.text,
+          expiryDate: expiry,
+        );
+      } catch (e) {
+        debugPrint("Error fecha notificación: $e");
+      }
+    } else {
+      // Si se desactiva, cancelamos cualquier notificación pendiente para este ID
+      await NotificationService().cancelNotification(docId);
     }
 
     if (mounted) Navigator.pop(context, true);
@@ -226,6 +229,17 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
                   onPressed: () => _selectDate(context),
                 ),
               ),
+            ),
+            SwitchListTile(
+              title: const Text("Activar recordatorio"),
+              subtitle: const Text("Notificar 30 días antes del vencimiento"),
+              value: _notificationsEnabled,
+              onChanged: (bool value) {
+                setState(() {
+                  _notificationsEnabled = value;
+                });
+              },
+              secondary: const Icon(Icons.notifications_active),
             ),
             DropdownButton<String>(
               isExpanded: true,

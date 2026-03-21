@@ -79,8 +79,9 @@ class _HomeScreenState extends State<HomeScreen> {
         final now = DateTime.now();
         final nextWeek = now.add(const Duration(days: 7));
         _items = _items.where((i) {
-          if (i.type != ItemType.document || i.expirationDate == null)
+          if (i.type != ItemType.document || i.expirationDate == null) {
             return false;
+          }
           return i.expirationDate!.isAfter(now) &&
               i.expirationDate!.isBefore(nextWeek);
         }).toList();
@@ -137,44 +138,44 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Future<void> _searchDocuments(String query) async {
-    if (query.isEmpty) {
-      _refreshItems();
-      return;
-    }
+  // Future<void> _searchDocuments(String query) async {
+  //   if (query.isEmpty) {
+  //     _refreshItems();
+  //     return;
+  //   }
 
-    // Consulta global para la búsqueda
-    final allData = await DatabaseHelper.instance.queryAllItems();
+  //   // Consulta global para la búsqueda
+  //   final allData = await DatabaseHelper.instance.queryAllItems();
 
-    setState(() {
-      // IMPORTANTE: Actualizamos _rawItems con los resultados de la búsqueda
-      // para que _buildItemRow encuentre el documento original al editar.
-      _rawItems = allData
-          .where((item) =>
-              item['type'] == 'document' &&
-              item['name']
-                  .toString()
-                  .toLowerCase()
-                  .contains(query.toLowerCase()))
-          .toList();
+  //   setState(() {
+  //     // IMPORTANTE: Actualizamos _rawItems con los resultados de la búsqueda
+  //     // para que _buildItemRow encuentre el documento original al editar.
+  //     _rawItems = allData
+  //         .where((item) =>
+  //             item['type'] == 'document' &&
+  //             item['name']
+  //                 .toString()
+  //                 .toLowerCase()
+  //                 .contains(query.toLowerCase()))
+  //         .toList();
 
-      _items = _rawItems.map((item) {
-        DateTime? expiry;
-        if (item['expiration_date'] != null) {
-          try {
-            expiry = DateFormat('dd/MM/yyyy')
-                .parse(item['expiration_date'].toString());
-          } catch (_) {}
-        }
-        return FollowItem(
-          id: item['id'].toString(),
-          name: item['name'].toString(),
-          type: ItemType.document,
-          expirationDate: expiry,
-        );
-      }).toList();
-    });
-  }
+  //     _items = _rawItems.map((item) {
+  //       DateTime? expiry;
+  //       if (item['expiration_date'] != null) {
+  //         try {
+  //           expiry = DateFormat('dd/MM/yyyy')
+  //               .parse(item['expiration_date'].toString());
+  //         } catch (_) {}
+  //       }
+  //       return FollowItem(
+  //         id: item['id'].toString(),
+  //         name: item['name'].toString(),
+  //         type: ItemType.document,
+  //         expirationDate: expiry,
+  //       );
+  //     }).toList();
+  //   });
+  // }
 
   Widget _buildItemRow(FollowItem item) {
     final Map<String, dynamic> rawDoc = _rawItems.firstWhere(
@@ -292,7 +293,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     'is_active': 1,
                   });
                 }
-                if (!mounted) return;
+                if (!context.mounted) return;
                 Navigator.pop(context);
                 _refreshItems();
               }
