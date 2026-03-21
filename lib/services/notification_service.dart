@@ -130,8 +130,7 @@ class NotificationService {
   }
 
   Future<void> cancelNotification(String id) async {
-    // El ID debe ser un entero para flutter_local_notifications.
-    // Usamos el hashCode del String id como convención que ya manejamos.
-    await FlutterLocalNotificationsPlugin.cancel(id.hashCode);
+    // Se usa la instancia de la clase, no la clase directamente
+    await _notifications.cancel(id.hashCode);
   }
 }
