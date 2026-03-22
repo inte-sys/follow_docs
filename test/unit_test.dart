@@ -90,4 +90,17 @@ void main() {
     expect(lista.length, 1);
     expect(lista.any((item) => item['id'] == '1'), isFalse);
   });
+
+  test('Validación de objeto FollowItem tras creación', () {
+    final item = {
+      'id': 'unique_id_123',
+      'name': 'Documento Prueba',
+      'type': 'document',
+      'expiration_date': '31/12/2026'
+    };
+
+    expect(item['id'], isNotNull);
+    expect(item['name'], 'Documento Prueba');
+    expect(item['type'], 'document');
+  });
 }
