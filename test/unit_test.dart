@@ -33,6 +33,7 @@
 //   });
 // }
 
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:uuid/uuid.dart';
 
@@ -114,5 +115,16 @@ void main() {
 
     expect(coincidencia, isNotNull);
     expect(coincidencia!.group(0), '25/12/2030');
+  });
+
+  test('Acción: Integración de fecha detectada en el controlador', () {
+    final controlador = TextEditingController();
+    const fechaDetectada = "25/12/2030";
+
+    // Simulación de la acción que ocurre tras cerrar la cámara
+    controlador.text = fechaDetectada;
+
+    expect(controlador.text, fechaDetectada);
+    expect(controlador.text.split('/').length, 3);
   });
 }
