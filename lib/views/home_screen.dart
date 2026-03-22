@@ -186,6 +186,31 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Dismissible(
         key: Key(item.id),
         direction: DismissDirection.endToStart,
+        // Inicio del bloque de confirmación
+        confirmDismiss: (direction) async {
+          return await showDialog(
+            context: context,
+            builder: (BuildContext context) {
+              return AlertDialog(
+                title: const Text("Confirmar eliminación"),
+                content: Text(
+                    "¿Deseas borrar '${item.name}'? Esta acción no se puede deshacer."),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(false),
+                    child: const Text("CANCELAR"),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(true),
+                    child: const Text("ELIMINAR",
+                        style: TextStyle(color: Colors.red)),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+        // Fin del bloque de confirmación
         background: Container(
           decoration: BoxDecoration(
               color: Colors.red.shade400,
