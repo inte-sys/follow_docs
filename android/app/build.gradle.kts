@@ -26,18 +26,19 @@ android {
     }
 
     kotlinOptions {
+        // Corrección: Uso de la sintaxis recomendada para evitar warnings
         jvmTarget = "1.8"
     }
 
     defaultConfig {
         applicationId = "com.example.follow_docs"
-        minSdk = flutter.minSdkVersion
+        // Corrección: minSdk debe ser 21 para soportar ML Kit y Camera
+        minSdk = 21
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
 
-    // 2. Configuración de firmas (Debe ir ANTES de buildTypes)
     signingConfigs {
         create("release") {
             keyAlias = keystoreProperties["keyAlias"] as String?
@@ -47,13 +48,9 @@ android {
         }
     }
 
-    // 3. Tipos de compilación (Unificados en un solo bloque)
     buildTypes {
         getByName("release") {
-            // Referencia a la firma 'release' creada arriba
             signingConfig = signingConfigs.getByName("release")
-            
-            // Optimizaciones de producción
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
@@ -70,7 +67,6 @@ android {
 
 flutter {
     source = "../.."
-    minSdkVersion = 21   
 }
 
 dependencies {
