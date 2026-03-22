@@ -33,7 +33,7 @@ android {
     defaultConfig {
         applicationId = "com.example.follow_docs"
         // Corrección: minSdk debe ser 21 para soportar ML Kit y Camera
-        minSdk = 21
+        minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
