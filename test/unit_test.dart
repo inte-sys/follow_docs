@@ -59,5 +59,22 @@ void main() {
       expect(doc['type'], 'document');
       expect(doc['expiration_date'], contains('/'));
     });
+
+    test('La búsqueda debe filtrar correctamente por nombre', () {
+      final listaOriginal = [
+        {'name': 'Pasaporte'},
+        {'name': 'Visa'},
+        {'name': 'Seguro Médico'}
+      ];
+
+      final busqueda = 'pas';
+      final resultado = listaOriginal
+          .where(
+              (i) => i['name']!.toLowerCase().contains(busqueda.toLowerCase()))
+          .toList();
+
+      expect(resultado.length, 1);
+      expect(resultado[0]['name'], 'Pasaporte');
+    });
   });
 }

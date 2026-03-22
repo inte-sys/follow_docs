@@ -38,20 +38,19 @@ class _HomeScreenState extends State<HomeScreen> {
   Map<String, String?> get _currentLevel => _navigationStack.last;
 
   Future<void> _refreshItems() async {
-    // Consulta basada en el ID del nivel actual de la pila
-    // final data =
-    //     await DatabaseHelper.instance.queryItemsByParent(_currentLevel['id']);
-    // Si hay un filtro activo que no sea "todos", buscamos en toda la DB
-    List<Map<String, dynamic>> data;
-    if (_activeFilter == DocFilter.all) {
-      data =
-          await DatabaseHelper.instance.queryItemsByParent(_currentLevel['id']);
-    } else {
-      data = await DatabaseHelper.instance.queryAllItems();
-    }
+    final searchText = _searchController.text.trim();
+
+    // 1. Obtener datos crudos usando el nuevo método del Helper
+    final List<Map<String, dynamic>> data =
+        await DatabaseHelper.instance.getItems(
+      parentId:
+          _currentLevel['id'], // Mantiene tu estructura de niveles [cite: 3]
+      search: searchText.isEmpty ? null : searchText,
+    );
 
     setState(() {
       _rawItems = data;
+      // 2. Mapeo a objetos FollowItem [cite: 6]
       _items = data.map((item) {
         DateTime? expiry;
         if (item['expiration_date'] != null &&
@@ -61,7 +60,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 .parse(item['expiration_date'].toString());
           } catch (_) {}
         }
-
         return FollowItem(
           id: item['id']?.toString() ?? '',
           name: item['name']?.toString() ?? 'Sin nombre',
@@ -70,7 +68,7 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       }).toList();
 
-      // Aplicar lógica de filtrado por fecha
+      // 3. Preservar tu lógica de filtrado por estado (Vencidos/Próximos) [cite: 7, 8]
       if (_activeFilter == DocFilter.expired) {
         _items = _items
             .where((i) => i.type == ItemType.document && i.isExpired)
@@ -349,16 +347,31 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Scaffold(
         appBar: AppBar(
           title: _isSearching
+              // ? TextField(
+              //     controller: _searchController,
+              //     autofocus: true,
+              //     style: const TextStyle(color: Colors.white),
+              //     decoration: const InputDecoration(
+              //         hintText: "Buscar...",
+              //         hintStyle: TextStyle(color: Colors.white70),
+              //         border: InputBorder.none),
+              //     onChanged: (q) =>
+              //         _refreshItems(), // Simplificado para usar la misma lógica
+              //   )
               ? TextField(
                   controller: _searchController,
                   autofocus: true,
-                  style: const TextStyle(color: Colors.white),
+                  style: const TextStyle(
+                      color: Colors.black, fontSize: 18), // Texto visible
                   decoration: const InputDecoration(
-                      hintText: "Buscar...",
-                      hintStyle: TextStyle(color: Colors.white70),
-                      border: InputBorder.none),
+                    hintText: "Buscar documento...",
+                    hintStyle: TextStyle(color: Colors.black), // Hint visible
+                    border: InputBorder.none,
+                  ),
                   onChanged: (q) =>
-                      _refreshItems(), // Simplificado para usar la misma lógica
+                      _refreshItems(), // Al usar el filtro unificado, esto debe disparar la búsqueda{
+                  // { _refreshItems(); // Al usar el filtro unificado, esto debe disparar la búsqueda
+                  // },
                 )
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

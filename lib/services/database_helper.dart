@@ -80,4 +80,27 @@ class DatabaseHelper {
       orderBy: "type = 'document' ASC, LOWER(name) ASC",
     );
   }
+
+  Future<List<Map<String, dynamic>>> getItems(
+      {String? parentId, String? search}) async {
+    final db = await instance.database;
+
+    if (search != null && search.isNotEmpty) {
+      // Si hay búsqueda, ignora la carpeta actual para encontrar el archivo en cualquier lugar
+      return await db.query(
+        'items',
+        where: 'name LIKE ?',
+        whereArgs: ['%$search%'],
+        orderBy: 'type DESC, name ASC',
+      );
+    } else {
+      // Lógica normal de navegación por carpetas
+      return await db.query(
+        'items',
+        where: parentId == null ? 'parent_id IS NULL' : 'parent_id = ?',
+        whereArgs: parentId == null ? [] : [parentId],
+        orderBy: 'type DESC, name ASC',
+      );
+    }
+  }
 }
