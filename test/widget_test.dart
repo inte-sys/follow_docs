@@ -32,23 +32,26 @@ void main() {
       (WidgetTester tester) async {
     await tester.pumpWidget(const MyApp());
 
-    // 1. Esperar a que pase la pantalla de carga (InitializerScreen)
-    await tester.pumpAndSettle(const Duration(seconds: 2));
+    // 1. En lugar de pumpAndSettle, usamos pump repetidamente
+    // para avanzar frames manualmente hasta que aparezca la Home.
+    // Esto evita el "timeout" por animaciones infinitas.
+    for (int i = 0; i < 5; i++) {
+      await tester.pump(const Duration(seconds: 1));
+    }
 
     // 2. Verificar que llegamos a la pantalla Principal
     expect(find.text('Principal'), findsOneWidget);
 
-    // 3. Simular apertura del buscador (clic en icono lupa)
+    // 3. Simular apertura del buscador
     final searchIcon = find.byIcon(Icons.search);
     if (searchIcon.evaluate().isNotEmpty) {
       await tester.tap(searchIcon);
-      await tester.pumpAndSettle();
+      await tester.pumpAndSettle(); // Aquí ya es seguro usarlo
 
       // 4. Escribir en el buscador
       await tester.enterText(find.byType(TextField), 'Test');
       await tester.pump();
 
-      // Verificación de que el texto se ingresó
       expect(find.text('Test'), findsOneWidget);
     }
   });

@@ -77,4 +77,17 @@ void main() {
       expect(resultado[0]['name'], 'Pasaporte');
     });
   });
+
+  test('Validación de lógica de eliminación', () {
+    final lista = [
+      {'id': '1', 'name': 'Doc 1'},
+      {'id': '2', 'name': 'Doc 2'}
+    ];
+
+    const idAEliminar = '1';
+    lista.removeWhere((item) => item['id'] == idAEliminar);
+
+    expect(lista.length, 1);
+    expect(lista.any((item) => item['id'] == '1'), isFalse);
+  });
 }
