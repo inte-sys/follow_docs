@@ -1,5 +1,4 @@
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
-import 'dart:io';
 
 // class OCRService {
 //   final TextRecognizer _textRecognizer = TextRecognizer();
@@ -64,28 +63,35 @@ import 'dart:io';
 // }
 
 class OCRService {
+  // Usamos el script latino para documentos en español/inglés
   final _textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
 
   Future<String?> extractExpirationDate(String imagePath) async {
-    final inputImage = InputImage.fromFilePath(imagePath);
-    final RecognizedText recognizedText =
-        await _textRecognizer.processImage(inputImage);
+    try {
+      final inputImage = InputImage.fromFilePath(imagePath);
+      final RecognizedText recognizedText =
+          await _textRecognizer.processImage(inputImage);
 
-    // Expresión regular para formatos comunes de fecha (dd/mm/yyyy, dd-mm-yyyy, dd.mm.yyyy)
-    final RegExp dateRegExp = RegExp(r'(\d{2}[/\-. ]\d{2}[/\-. ]\d{4})');
+      // Expresión regular mejorada para capturar dd/mm/yyyy
+      final RegExp dateRegExp = RegExp(r'(\d{2}[/\-. ]\d{2}[/\-. ]\d{4})');
 
-    String fullText = recognizedText.text;
-    Iterable<RegExpMatch> matches = dateRegExp.allMatches(fullText);
+      String fullText = recognizedText.text;
 
-    if (matches.isNotEmpty) {
-      // Normalmente la fecha de vencimiento es la última que aparece en documentos
-      // o la que está más alejada de la fecha de emisión.
-      return matches.last.group(0);
+      // Buscamos todas las coincidencias
+      Iterable<RegExpMatch> matches = dateRegExp.allMatches(fullText);
+
+      if (matches.isNotEmpty) {
+        // En documentos, la fecha de vencimiento suele ser la última que aparece
+        return matches.last.group(0);
+      }
+      return null;
+    } catch (e) {
+      print("Error en OCR: $e");
+      return null;
     }
-
-    return null;
   }
 
+  // IMPORTANTE: Llamar a esto cuando ya no se use el servicio
   void dispose() {
     _textRecognizer.close();
   }

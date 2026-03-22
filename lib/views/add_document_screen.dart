@@ -4,6 +4,8 @@ import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
 import 'package:uuid/uuid.dart';
 import '../services/database_helper.dart';
 import '../services/notification_service.dart';
+import 'camera_scanner_screen.dart';
+import '../services/ocr_service.dart';
 
 class AddDocumentScreen extends StatefulWidget {
   final Map<String, dynamic>? existingDoc;
@@ -192,7 +194,6 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
   }
 
   Future<void> _pickAndScanImage() async {
-    // Abrimos la pantalla de cámara y esperamos el resultado (la fecha)
     final String? detectedDate = await Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const CameraScannerScreen()),
@@ -200,9 +201,10 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
 
     if (detectedDate != null) {
       setState(() {
-        // Asumiendo que tu controlador de fecha se llama _expirationController
-        _expirationController.text = detectedDate;
+        // CORRECCIÓN: Tu controlador se llama _dateController, no _expirationController
+        _dateController.text = detectedDate;
       });
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Fecha detectada: $detectedDate")),
       );
