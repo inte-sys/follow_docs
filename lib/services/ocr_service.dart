@@ -1,59 +1,88 @@
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
+import 'dart:io';
+
+// class OCRService {
+//   final TextRecognizer _textRecognizer = TextRecognizer();
+
+//   Future<Map<String, dynamic>> scanDocument(String imagePath) async {
+//     final inputImage = InputImage.fromFilePath(imagePath);
+//     final RecognizedText recognizedText =
+//         await _textRecognizer.processImage(inputImage);
+
+//     String fullText = recognizedText.text;
+//     String? suggestedType;
+//     DateTime? suggestedExpiryDate;
+
+//     // Identificar tipo de documento
+//     if (fullText.contains(
+//         RegExp(r'DNI|Cédula|Pasaporte|Licencia', caseSensitive: false))) {
+//       suggestedType = _inferDocumentType(fullText);
+//     }
+
+//     // Buscar patrones de fecha de vencimiento
+//     suggestedExpiryDate = _extractExpirationDate(fullText);
+
+//     return {
+//       'text': fullText,
+//       'suggestedType': suggestedType,
+//       'expiryDate': suggestedExpiryDate,
+//     };
+//   }
+
+//   String? _inferDocumentType(String text) {
+//     if (text.contains(RegExp(r'Licencia', caseSensitive: false))) {
+//       return "Licencia de conducir";
+//     }
+//     if (text.contains(RegExp(r'Pasaporte', caseSensitive: false))) {
+//       return "Pasaporte";
+//     }
+//     if (text.contains(RegExp(r'DNI|Cédula', caseSensitive: false))) {
+//       return "DNI/Cédula";
+//     }
+//     return null;
+//   }
+
+//   DateTime? _extractExpirationDate(String text) {
+//     // Busca patrones comunes de fechas (DD/MM/AAAA o similares)
+//     // cercanos a palabras clave como "Vence" o "Expiración"
+//     final dateRegExp = RegExp(r'(\d{2}/\d{2}/\d{4})');
+//     final match = dateRegExp.firstMatch(text);
+//     if (match != null) {
+//       try {
+//         // Lógica simplificada para el MVP
+//         return DateTime.parse(match.group(0)!.split('/').reversed.join('-'));
+//       } catch (_) {
+//         return null;
+//       }
+//     }
+//     return null;
+//   }
+
+//   void dispose() {
+//     _textRecognizer.close();
+//   }
+// }
 
 class OCRService {
-  final TextRecognizer _textRecognizer = TextRecognizer();
+  final _textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
 
-  Future<Map<String, dynamic>> scanDocument(String imagePath) async {
+  Future<String?> extractExpirationDate(String imagePath) async {
     final inputImage = InputImage.fromFilePath(imagePath);
     final RecognizedText recognizedText =
         await _textRecognizer.processImage(inputImage);
 
+    // Expresión regular para formatos comunes de fecha (dd/mm/yyyy, dd-mm-yyyy, dd.mm.yyyy)
+    final RegExp dateRegExp = RegExp(r'(\d{2}[/\-. ]\d{2}[/\-. ]\d{4})');
+
     String fullText = recognizedText.text;
-    String? suggestedType;
-    DateTime? suggestedExpiryDate;
+    Iterable<RegExpMatch> matches = dateRegExp.allMatches(fullText);
 
-    // Identificar tipo de documento
-    if (fullText.contains(
-        RegExp(r'DNI|Cédula|Pasaporte|Licencia', caseSensitive: false))) {
-      suggestedType = _inferDocumentType(fullText);
+    if (matches.isNotEmpty) {
+      // Normalmente la fecha de vencimiento es la última que aparece en documentos
+      // o la que está más alejada de la fecha de emisión.
+      return matches.last.group(0);
     }
 
-    // Buscar patrones de fecha de vencimiento
-    suggestedExpiryDate = _extractExpirationDate(fullText);
-
-    return {
-      'text': fullText,
-      'suggestedType': suggestedType,
-      'expiryDate': suggestedExpiryDate,
-    };
-  }
-
-  String? _inferDocumentType(String text) {
-    if (text.contains(RegExp(r'Licencia', caseSensitive: false))) {
-      return "Licencia de conducir";
-    }
-    if (text.contains(RegExp(r'Pasaporte', caseSensitive: false))) {
-      return "Pasaporte";
-    }
-    if (text.contains(RegExp(r'DNI|Cédula', caseSensitive: false))) {
-      return "DNI/Cédula";
-    }
-    return null;
-  }
-
-  DateTime? _extractExpirationDate(String text) {
-    // Busca patrones comunes de fechas (DD/MM/AAAA o similares)
-    // cercanos a palabras clave como "Vence" o "Expiración"
-    final dateRegExp = RegExp(r'(\d{2}/\d{2}/\d{4})');
-    final match = dateRegExp.firstMatch(text);
-    if (match != null) {
-      try {
-        // Lógica simplificada para el MVP
-        return DateTime.parse(match.group(0)!.split('/').reversed.join('-'));
-      } catch (_) {
-        return null;
-      }
-    }
     return null;
   }
 

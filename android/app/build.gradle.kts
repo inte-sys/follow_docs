@@ -70,6 +70,7 @@ android {
 
 flutter {
     source = "../.."
+    minSdkVersion = 21   
 }
 
 dependencies {

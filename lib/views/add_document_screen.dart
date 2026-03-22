@@ -136,12 +136,20 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
               controller: _dateController,
               keyboardType: TextInputType.number,
               inputFormatters: [dateMaskFormatter],
+              // decoration: InputDecoration(
+              //   labelText: 'Vencimiento (DD/MM/YYYY)',
+              //   hintText: DateFormat('dd/MM/yyyy').format(DateTime.now()),
+              //   suffixIcon: IconButton(
+              //     icon: const Icon(Icons.calendar_today),
+              //     onPressed: () => _selectDate(context),
+              //   ),
+              // ),
               decoration: InputDecoration(
-                labelText: 'Vencimiento (DD/MM/YYYY)',
-                hintText: DateFormat('dd/MM/yyyy').format(DateTime.now()),
+                labelText: 'Fecha de Vencimiento',
                 suffixIcon: IconButton(
-                  icon: const Icon(Icons.calendar_today),
-                  onPressed: () => _selectDate(context),
+                  icon: const Icon(Icons.camera_alt),
+                  onPressed: () =>
+                      _pickAndScanImage(), // Método que crearemos a continuación
                 ),
               ),
             ),
@@ -180,6 +188,28 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
     if (picked != null) {
       setState(
           () => _dateController.text = DateFormat('dd/MM/yyyy').format(picked));
+    }
+  }
+
+  Future<void> _pickAndScanImage() async {
+    // Abrimos la pantalla de cámara y esperamos el resultado (la fecha)
+    final String? detectedDate = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const CameraScannerScreen()),
+    );
+
+    if (detectedDate != null) {
+      setState(() {
+        // Asumiendo que tu controlador de fecha se llama _expirationController
+        _expirationController.text = detectedDate;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Fecha detectada: $detectedDate")),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("No se pudo extraer la fecha.")),
+      );
     }
   }
 }

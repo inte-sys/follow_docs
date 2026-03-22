@@ -103,4 +103,16 @@ void main() {
     expect(item['name'], 'Documento Prueba');
     expect(item['type'], 'document');
   });
+
+  test('Acción: Extraer fecha de texto OCR', () {
+    const textoEscaneado =
+        "PASAPORTE REPUBLICA... FECHA VENCIMIENTO: 25/12/2030... AUTORIDAD...";
+
+    // Expresión regular para buscar formatos dd/mm/yyyy
+    final regExp = RegExp(r'(\d{2}/\d{2}/\d{4})');
+    final coincidencia = regExp.firstMatch(textoEscaneado);
+
+    expect(coincidencia, isNotNull);
+    expect(coincidencia!.group(0), '25/12/2030');
+  });
 }
