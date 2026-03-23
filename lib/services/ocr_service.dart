@@ -66,28 +66,40 @@ class OCRService {
   // Usamos el script latino para documentos en español/inglés
   final _textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
 
-  Future<String?> extractExpirationDate(String imagePath) async {
+  Future<Map<String, String?>> analyzeDocument(String imagePath) async {
     try {
       final inputImage = InputImage.fromFilePath(imagePath);
       final RecognizedText recognizedText =
           await _textRecognizer.processImage(inputImage);
+      final String fullText = recognizedText.text.toLowerCase();
 
-      // Expresión regular mejorada para capturar dd/mm/yyyy
+      // 1. Buscar Fecha de Vencimiento
       final RegExp dateRegExp = RegExp(r'(\d{2}[/\-. ]\d{2}[/\-. ]\d{4})');
-
-      String fullText = recognizedText.text;
-
-      // Buscamos todas las coincidencias
       Iterable<RegExpMatch> matches = dateRegExp.allMatches(fullText);
+      String? detectedDate = matches.isNotEmpty ? matches.last.group(0) : null;
 
-      if (matches.isNotEmpty) {
-        // En documentos, la fecha de vencimiento suele ser la última que aparece
-        return matches.last.group(0);
+      // 2. Determinar Tipo de Documento por palabras clave
+      String? detectedType;
+      if (fullText.contains('pasaporte') || fullText.contains('passport')) {
+        detectedType = 'Pasaporte';
+      } else if (fullText.contains('licencia') ||
+          fullText.contains('license') ||
+          fullText.contains('conducir')) {
+        detectedType = 'Licencia';
+      } else if (fullText.contains('visa')) {
+        detectedType = 'Visa';
+      } else if (fullText.contains('seguro') ||
+          fullText.contains('insurance') ||
+          fullText.contains('póliza')) {
+        detectedType = 'Seguro';
       }
-      return null;
+
+      return {
+        'date': detectedDate,
+        'type': detectedType,
+      };
     } catch (e) {
-      print("Error en OCR: $e");
-      return null;
+      return {'date': null, 'type': null};
     }
   }
 

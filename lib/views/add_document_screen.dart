@@ -194,23 +194,34 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
   }
 
   Future<void> _pickAndScanImage() async {
-    final String? detectedDate = await Navigator.push(
+    final String? imagePath = await Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const CameraScannerScreen()),
     );
 
-    if (detectedDate != null) {
+    if (imagePath != null) {
+      final ocr = OCRService();
+      final result = await ocr.analyzeDocument(imagePath);
+      ocr.dispose();
+
       setState(() {
-        // CORRECCIÓN: Tu controlador se llama _dateController, no _expirationController
-        _dateController.text = detectedDate;
+        // Si detectó fecha, la pone en el campo
+        if (result['date'] != null) {
+          _dateController.text = result['date']!;
+        }
+
+        // Si detectó tipo y está en nuestra lista, lo selecciona
+        if (result['type'] != null && _docTypes.contains(result['type'])) {
+          _selectedType = result['type']!;
+        }
       });
 
+      String mensaje = result['type'] != null
+          ? "Detectado: ${result['type']}"
+          : "Documento procesado";
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Fecha detectada: $detectedDate")),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("No se pudo extraer la fecha.")),
+        SnackBar(content: Text(mensaje)),
       );
     }
   }

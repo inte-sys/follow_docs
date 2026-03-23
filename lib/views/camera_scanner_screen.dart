@@ -39,10 +39,11 @@ class _CameraScannerScreenState extends State<CameraScannerScreen> {
     try {
       final image = await _controller!.takePicture();
       final ocr = OCRService();
-      final date = await ocr.extractExpirationDate(image.path);
+      // final date = await ocr.extractExpirationDate(image.path);
       ocr.dispose();
 
-      if (mounted) Navigator.pop(context, date);
+      // if (mounted) Navigator.pop(context, date);
+      if (mounted) Navigator.pop(context, image.path);
     } catch (e) {
       if (mounted) Navigator.pop(context, null);
     }
