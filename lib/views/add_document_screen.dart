@@ -22,9 +22,15 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
   final TextEditingController _dateController = TextEditingController();
   final TextEditingController _customTypeController = TextEditingController();
 
+  // Controlador para que el usuario escriba el número de la alerta
+  final TextEditingController _notifValueController =
+      TextEditingController(text: '7');
+
   String _selectedType = 'Pasaporte';
   bool _notificationsEnabled = true;
+  String _notifUnit = 'Días';
 
+  final List<String> _unitOptions = ['Días', 'Semanas', 'Meses'];
   final List<String> _docTypes = [
     'Pasaporte',
     'Licencia',
@@ -41,10 +47,14 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
   @override
   void initState() {
     super.initState();
-    // Carga de datos inicial si se trata de una edición
     if (widget.existingDoc != null) {
       _nameController.text = widget.existingDoc!['name'] ?? '';
       _dateController.text = widget.existingDoc!['expiration_date'] ?? '';
+
+      // RECUPERACIÓN: Cargamos los valores guardados de la antelación
+      _notifValueController.text =
+          (widget.existingDoc!['notif_value'] ?? 7).toString();
+      _notifUnit = widget.existingDoc!['notif_unit'] ?? 'Días';
 
       final savedType = widget.existingDoc!['doc_type'] ?? 'Pasaporte';
       if (_docTypes.contains(savedType)) {
@@ -53,13 +63,12 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
         _selectedType = 'Otro';
         _customTypeController.text = savedType;
       }
-
       _notificationsEnabled = widget.existingDoc!['is_active'] == 1;
     }
   }
 
-  /// Guarda el documento en la base de datos y programa la alerta si es necesario
   Future<void> _saveDoc() async {
+    // 1. Validaciones básicas
     if (_nameController.text.isEmpty || _dateController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Por favor rellena todos los campos")),
@@ -67,9 +76,9 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
       return;
     }
 
-    // Validación rigurosa de la fecha
+    DateTime expiryDate;
     try {
-      DateFormat('dd/MM/yyyy').parse(_dateController.text);
+      expiryDate = DateFormat('dd/MM/yyyy').parse(_dateController.text);
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Formato de fecha inválido (DD/MM/AAAA)")),
@@ -77,6 +86,34 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
       return;
     }
 
+    // 2. Validación de la antelación
+    int notifValue = int.tryParse(_notifValueController.text) ?? 0;
+    if (notifValue <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Indica un número válido para la alerta")),
+      );
+      return;
+    }
+
+    // Lógica de límite de 5 años (1825 días)
+    int totalDays;
+    if (_notifUnit == 'Semanas') {
+      totalDays = notifValue * 7;
+    } else if (_notifUnit == 'Meses') {
+      totalDays = notifValue * 30;
+    } else {
+      totalDays = notifValue;
+    }
+
+    if (totalDays > 1825) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text("El recordatorio no puede ser mayor a 5 años")),
+      );
+      return;
+    }
+
+    // 3. Preparación de datos
     final String docId = widget.existingDoc != null
         ? widget.existingDoc!['id']
         : const Uuid().v4();
@@ -93,40 +130,47 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
       'expiration_date': _dateController.text,
       'is_active': _notificationsEnabled ? 1 : 0,
       'parent_id': widget.parentId,
+      'notif_value': notifValue, // Se guarda la cantidad
+      'notif_unit': _notifUnit, // Se guarda el lapso
     };
 
-    // Operación en la base de datos
-    if (widget.existingDoc != null) {
-      await DatabaseHelper.instance.updateItem(data);
-    } else {
-      await DatabaseHelper.instance.insertItem(data);
-    }
+    try {
+      // 4. Intento de guardado protegido
+      if (widget.existingDoc != null) {
+        await DatabaseHelper.instance.updateItem(data);
+      } else {
+        await DatabaseHelper.instance.insertItem(data);
+      }
 
-    // Programación de la notificación 7 días antes del vencimiento
-    if (_notificationsEnabled) {
-      try {
-        final DateTime expiry =
-            DateFormat('dd/MM/yyyy').parse(_dateController.text);
-
+      // 5. Gestión de Notificación
+      if (_notificationsEnabled) {
         await NotificationService().scheduleNotification(
           id: docId.hashCode,
           title: "Vencimiento Próximo",
           body:
-              "Tu ${finalType.toLowerCase()} '${_nameController.text}' vence en 7 días.",
-          scheduledDate: expiry,
+              "Tu ${finalType.toLowerCase()} '${_nameController.text}' vence en $notifValue ${_notifUnit.toLowerCase()}.",
+          scheduledDate: expiryDate.subtract(Duration(days: totalDays)),
         );
-      } catch (e) {
-        debugPrint("Error al programar notificación: $e");
+      } else {
+        await NotificationService()
+            .cancelNotification(docId.hashCode as String);
       }
-    } else {
-      // Cancelar si el usuario desactiva los recordatorios
-      await NotificationService().cancelNotification(docId.hashCode.toString());
-    }
 
-    if (mounted) Navigator.pop(context, true);
+      // 6. Salida exitosa
+      if (mounted) Navigator.pop(context, true);
+    } catch (e) {
+      // Si falla es porque la base de datos necesita reiniciarse (reinstalar app)
+      debugPrint("ERROR AL GUARDAR: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text(
+                  "Error: Reinstala la app para actualizar la base de datos")),
+        );
+      }
+    }
   }
 
-  /// Inicia el flujo de cámara y procesa los resultados con OCR
   Future<void> _pickAndScanImage() async {
     final String? imagePath = await Navigator.push(
       context,
@@ -135,29 +179,15 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
 
     if (imagePath != null) {
       final ocr = OCRService();
-      // El servicio ahora devuelve tanto la fecha como la categoría detectada
       final result = await ocr.analyzeDocument(imagePath);
       ocr.dispose();
 
       setState(() {
-        if (result['date'] != null) {
-          _dateController.text = result['date']!;
-        }
-
-        if (result['type'] != null) {
-          final String detected = result['type']!;
-          if (_docTypes.contains(detected)) {
-            _selectedType = detected;
-          }
+        if (result['date'] != null) _dateController.text = result['date']!;
+        if (result['type'] != null && _docTypes.contains(result['type'])) {
+          _selectedType = result['type']!;
         }
       });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content: Text(result['type'] != null
-                ? "Identificado como: ${result['type']}"
-                : "Datos extraídos con éxito")),
-      );
     }
   }
 
@@ -166,6 +196,7 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
     _nameController.dispose();
     _dateController.dispose();
     _customTypeController.dispose();
+    _notifValueController.dispose();
     super.dispose();
   }
 
@@ -191,7 +222,6 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
               controller: _nameController,
               decoration: const InputDecoration(
                 labelText: 'Nombre del documento',
-                hintText: 'Ej: Pasaporte de Luis',
                 border: OutlineInputBorder(),
               ),
             ),
@@ -203,18 +233,15 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
                   .toList(),
               onChanged: (val) => setState(() => _selectedType = val!),
               decoration: const InputDecoration(
-                labelText: 'Categoría',
-                border: OutlineInputBorder(),
-              ),
+                  labelText: 'Categoría', border: OutlineInputBorder()),
             ),
             if (_selectedType == 'Otro') ...[
               const SizedBox(height: 16),
               TextField(
                 controller: _customTypeController,
                 decoration: const InputDecoration(
-                  labelText: 'Tipo personalizado',
-                  border: OutlineInputBorder(),
-                ),
+                    labelText: 'Tipo personalizado',
+                    border: OutlineInputBorder()),
               ),
             ],
             const SizedBox(height: 16),
@@ -234,10 +261,42 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
             const SizedBox(height: 16),
             SwitchListTile(
               title: const Text("Notificaciones automáticas"),
-              subtitle: const Text("Avisar 7 días antes de expirar"),
+              subtitle: const Text("Programar aviso de vencimiento"),
               value: _notificationsEnabled,
               onChanged: (val) => setState(() => _notificationsEnabled = val),
             ),
+            if (_notificationsEnabled)
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 8.0,
+                  children: [
+                    const Text("Avisar "),
+                    // Cuadro de texto para escribir el número
+                    SizedBox(
+                      width: 50,
+                      child: TextField(
+                        controller: _notifValueController,
+                        keyboardType: TextInputType.number,
+                        textAlign: TextAlign.center,
+                        decoration: const InputDecoration(
+                          hintText: '0',
+                        ),
+                      ),
+                    ),
+                    DropdownButton<String>(
+                      value: _notifUnit,
+                      items: _unitOptions
+                          .map(
+                              (u) => DropdownMenuItem(value: u, child: Text(u)))
+                          .toList(),
+                      onChanged: (val) => setState(() => _notifUnit = val!),
+                    ),
+                    const Text(" antes."),
+                  ],
+                ),
+              ),
             const SizedBox(height: 32),
             SizedBox(
               width: double.infinity,

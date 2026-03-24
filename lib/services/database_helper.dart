@@ -31,11 +31,13 @@ class DatabaseHelper {
         CREATE TABLE items (
           id TEXT PRIMARY KEY,
           name TEXT NOT NULL,
-          type TEXT NOT NULL, -- 'folder' o 'document'
-          doc_type TEXT,      -- 'Pasaporte', 'Licencia', etc.
+          type TEXT NOT NULL,
+          doc_type TEXT,
           expiration_date TEXT,
           is_active INTEGER DEFAULT 1,
           parent_id TEXT,
+          notif_value INTEGER DEFAULT 7,
+          notif_unit TEXT DEFAULT 'Días',
           FOREIGN KEY (parent_id) REFERENCES items (id) ON DELETE CASCADE
         )
       ''');
