@@ -4,8 +4,8 @@ import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
 import 'package:uuid/uuid.dart';
 import '../services/database_helper.dart';
 import '../services/notification_service.dart';
-import 'camera_scanner_screen.dart';
 import '../services/ocr_service.dart';
+import 'camera_scanner_screen.dart';
 
 class AddDocumentScreen extends StatefulWidget {
   final Map<String, dynamic>? existingDoc;
@@ -18,14 +18,21 @@ class AddDocumentScreen extends StatefulWidget {
 }
 
 class _AddDocumentScreenState extends State<AddDocumentScreen> {
-  final _nameController = TextEditingController();
-  final _dateController = TextEditingController();
-  final _customTypeController = TextEditingController();
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _dateController = TextEditingController();
+  final TextEditingController _customTypeController = TextEditingController();
 
   String _selectedType = 'Pasaporte';
-  bool _notificationsEnabled = true; // Estado del Switch
+  bool _notificationsEnabled = true;
 
-  final _docTypes = ['Pasaporte', 'Licencia', 'Visa', 'Seguro', 'Otro'];
+  final List<String> _docTypes = [
+    'Pasaporte',
+    'Licencia',
+    'Visa',
+    'Seguro',
+    'Otro'
+  ];
+
   final dateMaskFormatter = MaskTextInputFormatter(
     mask: '##/##/####',
     filter: {"#": RegExp(r'[0-9]')},
@@ -34,23 +41,41 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
   @override
   void initState() {
     super.initState();
+    // Carga de datos inicial si se trata de una edición
     if (widget.existingDoc != null) {
       _nameController.text = widget.existingDoc!['name'] ?? '';
       _dateController.text = widget.existingDoc!['expiration_date'] ?? '';
-      _notificationsEnabled = widget.existingDoc!['is_active'] == 1;
 
-      String savedType = widget.existingDoc!['doc_type'] ?? 'Pasaporte';
-      if (!_docTypes.contains(savedType)) {
+      final savedType = widget.existingDoc!['doc_type'] ?? 'Pasaporte';
+      if (_docTypes.contains(savedType)) {
+        _selectedType = savedType;
+      } else {
         _selectedType = 'Otro';
         _customTypeController.text = savedType;
-      } else {
-        _selectedType = savedType;
       }
+
+      _notificationsEnabled = widget.existingDoc!['is_active'] == 1;
     }
   }
 
+  /// Guarda el documento en la base de datos y programa la alerta si es necesario
   Future<void> _saveDoc() async {
-    if (_nameController.text.isEmpty || _dateController.text.isEmpty) return;
+    if (_nameController.text.isEmpty || _dateController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Por favor rellena todos los campos")),
+      );
+      return;
+    }
+
+    // Validación rigurosa de la fecha
+    try {
+      DateFormat('dd/MM/yyyy').parse(_dateController.text);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Formato de fecha inválido (DD/MM/AAAA)")),
+      );
+      return;
+    }
 
     final String docId = widget.existingDoc != null
         ? widget.existingDoc!['id']
@@ -60,16 +85,7 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
         ? _customTypeController.text.trim()
         : _selectedType;
 
-    try {
-      DateFormat('dd/MM/yyyy').parse(_dateController.text);
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Formato de fecha inválido")),
-      );
-      return;
-    }
-
-    final data = {
+    final Map<String, dynamic> data = {
       'id': docId,
       'name': _nameController.text,
       'type': 'document',
@@ -79,120 +95,38 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
       'parent_id': widget.parentId,
     };
 
+    // Operación en la base de datos
     if (widget.existingDoc != null) {
       await DatabaseHelper.instance.updateItem(data);
     } else {
       await DatabaseHelper.instance.insertItem(data);
     }
 
+    // Programación de la notificación 7 días antes del vencimiento
     if (_notificationsEnabled) {
       try {
-        final expiry = DateFormat('dd/MM/yyyy').parse(_dateController.text);
-        await NotificationService().scheduleExpirationNotice(
-          id: docId,
-          title: _nameController.text,
-          expiryDate: expiry,
+        final DateTime expiry =
+            DateFormat('dd/MM/yyyy').parse(_dateController.text);
+
+        await NotificationService().scheduleNotification(
+          id: docId.hashCode,
+          title: "Vencimiento Próximo",
+          body:
+              "Tu ${finalType.toLowerCase()} '${_nameController.text}' vence en 7 días.",
+          scheduledDate: expiry,
         );
       } catch (e) {
-        debugPrint("Error notificación: $e");
+        debugPrint("Error al programar notificación: $e");
       }
     } else {
-      await NotificationService().cancelNotification(docId);
+      // Cancelar si el usuario desactiva los recordatorios
+      await NotificationService().cancelNotification(docId.hashCode.toString());
     }
 
     if (mounted) Navigator.pop(context, true);
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text("Detalles del Documento")),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            TextField(
-              controller: _nameController,
-              decoration:
-                  const InputDecoration(labelText: 'Nombre del documento'),
-            ),
-            const SizedBox(height: 16),
-            DropdownButtonFormField<String>(
-              initialValue: _selectedType,
-              items: _docTypes
-                  .map((t) => DropdownMenuItem(value: t, child: Text(t)))
-                  .toList(),
-              onChanged: (val) => setState(() => _selectedType = val!),
-              decoration: const InputDecoration(labelText: 'Tipo'),
-            ),
-            if (_selectedType == 'Otro') ...[
-              const SizedBox(height: 16),
-              TextField(
-                controller: _customTypeController,
-                decoration:
-                    const InputDecoration(labelText: 'Especifique tipo'),
-              ),
-            ],
-            const SizedBox(height: 16),
-            TextField(
-              controller: _dateController,
-              keyboardType: TextInputType.number,
-              inputFormatters: [dateMaskFormatter],
-              // decoration: InputDecoration(
-              //   labelText: 'Vencimiento (DD/MM/YYYY)',
-              //   hintText: DateFormat('dd/MM/yyyy').format(DateTime.now()),
-              //   suffixIcon: IconButton(
-              //     icon: const Icon(Icons.calendar_today),
-              //     onPressed: () => _selectDate(context),
-              //   ),
-              // ),
-              decoration: InputDecoration(
-                labelText: 'Fecha de Vencimiento',
-                suffixIcon: IconButton(
-                  icon: const Icon(Icons.camera_alt),
-                  onPressed: () =>
-                      _pickAndScanImage(), // Método que crearemos a continuación
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            SwitchListTile(
-              title: const Text("Activar recordatorio"),
-              subtitle: const Text("Notificar 30 días antes del vencimiento"),
-              value: _notificationsEnabled,
-              onChanged: (bool value) =>
-                  setState(() => _notificationsEnabled = value),
-              secondary: const Icon(Icons.notifications_active),
-            ),
-            const SizedBox(height: 30),
-            ElevatedButton(
-              onPressed: _saveDoc,
-              child: const Text("Guardar Documento"),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _selectDate(BuildContext context) async {
-    DateTime initial = DateTime.now();
-    try {
-      initial = DateFormat('dd/MM/yyyy').parse(_dateController.text);
-    } catch (_) {}
-
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: initial,
-      firstDate: DateTime(1900),
-      lastDate: DateTime(2100),
-    );
-    if (picked != null) {
-      setState(
-          () => _dateController.text = DateFormat('dd/MM/yyyy').format(picked));
-    }
-  }
-
+  /// Inicia el flujo de cámara y procesa los resultados con OCR
   Future<void> _pickAndScanImage() async {
     final String? imagePath = await Navigator.push(
       context,
@@ -201,28 +135,122 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
 
     if (imagePath != null) {
       final ocr = OCRService();
+      // El servicio ahora devuelve tanto la fecha como la categoría detectada
       final result = await ocr.analyzeDocument(imagePath);
       ocr.dispose();
 
       setState(() {
-        // Si detectó fecha, la pone en el campo
         if (result['date'] != null) {
           _dateController.text = result['date']!;
         }
 
-        // Si detectó tipo y está en nuestra lista, lo selecciona
-        if (result['type'] != null && _docTypes.contains(result['type'])) {
-          _selectedType = result['type']!;
+        if (result['type'] != null) {
+          final String detected = result['type']!;
+          if (_docTypes.contains(detected)) {
+            _selectedType = detected;
+          }
         }
       });
 
-      String mensaje = result['type'] != null
-          ? "Detectado: ${result['type']}"
-          : "Documento procesado";
-
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(mensaje)),
+        SnackBar(
+            content: Text(result['type'] != null
+                ? "Identificado como: ${result['type']}"
+                : "Datos extraídos con éxito")),
       );
     }
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _dateController.dispose();
+    _customTypeController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(widget.existingDoc == null
+            ? 'Nuevo Documento'
+            : 'Editar Documento'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.check),
+            onPressed: _saveDoc,
+          )
+        ],
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            TextField(
+              controller: _nameController,
+              decoration: const InputDecoration(
+                labelText: 'Nombre del documento',
+                hintText: 'Ej: Pasaporte de Luis',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              value: _selectedType,
+              items: _docTypes
+                  .map((t) => DropdownMenuItem(value: t, child: Text(t)))
+                  .toList(),
+              onChanged: (val) => setState(() => _selectedType = val!),
+              decoration: const InputDecoration(
+                labelText: 'Categoría',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            if (_selectedType == 'Otro') ...[
+              const SizedBox(height: 16),
+              TextField(
+                controller: _customTypeController,
+                decoration: const InputDecoration(
+                  labelText: 'Tipo personalizado',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _dateController,
+              inputFormatters: [dateMaskFormatter],
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: 'Fecha de Vencimiento (DD/MM/AAAA)',
+                border: const OutlineInputBorder(),
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.camera_alt),
+                  onPressed: _pickAndScanImage,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            SwitchListTile(
+              title: const Text("Notificaciones automáticas"),
+              subtitle: const Text("Avisar 7 días antes de expirar"),
+              value: _notificationsEnabled,
+              onChanged: (val) => setState(() => _notificationsEnabled = val),
+            ),
+            const SizedBox(height: 32),
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton.icon(
+                onPressed: _saveDoc,
+                icon: const Icon(Icons.save),
+                label: const Text("GUARDAR DATOS"),
+              ),
+            )
+          ],
+        ),
+      ),
+    );
   }
 }

@@ -1,0 +1,95 @@
+
+.dart_tool\dartpad\web_plugin_registrant.dart:14:void registerPlugins([final Registrar? pluginRegistrar]) {
+.dart_tool\flutter_build\dart_plugin_registrant.dart:30:class _PluginRegistrant {
+.dart_tool\flutter_build\dart_plugin_registrant.dart:33:  static void register() {
+lib\main.dart:6:void main() {
+lib\main.dart:7:  WidgetsFlutterBinding.ensureInitialized();
+lib\main.dart:11:class MyApp extends StatelessWidget {
+lib\main.dart:15:  Widget build(BuildContext context) {
+lib\main.dart:32:class InitializerScreen extends StatefulWidget {
+lib\main.dart:39:class _InitializerScreenState extends State<InitializerScreen> {
+lib\main.dart:45:  void initState() {
+lib\main.dart:50:  Future<void> _initializeApp() async {
+lib\main.dart:81:  Widget build(BuildContext context) {
+lib\models\item_model.dart:5:class FollowItem {
+lib\models\reminder_model.dart:3:class ReminderConfig {
+lib\services\database_helper.dart:5:class DatabaseHelper {
+lib\services\database_helper.dart:11:  Future<Database> get database async {
+lib\services\database_helper.dart:17:  Future<Database> _initDB(String filePath) async {
+lib\services\database_helper.dart:28:  Future _createDB(Database db, int version) async {
+lib\services\database_helper.dart:47:  Future<int> insertItem(Map<String, dynamic> row) async {
+lib\services\database_helper.dart:52:  Future<List<Map<String, dynamic>>> queryAllItems() async {
+lib\services\database_helper.dart:59:  Future<int> updateItem(Map<String, dynamic> row) async {
+lib\services\database_helper.dart:65:  Future<int> deleteItem(String id) async {
+lib\services\database_helper.dart:71:  Future<List<Map<String, dynamic>>> queryItemsByParent(
+lib\services\database_helper.dart:84:  Future<List<Map<String, dynamic>>> getItems(
+lib\services\notification_service.dart:7:class NotificationService {
+lib\services\notification_service.dart:15:  Future<void> init() async {
+lib\services\notification_service.dart:40:  Future<void> _configureLocalTimeZone() async {
+lib\services\notification_service.dart:52:  Future<void> scheduleExpirationNotice({
+lib\services\notification_service.dart:91:  Future<void> showInstantNotification(String title) async {
+lib\services\notification_service.dart:107:  Future<void> cancelNotification(String id) async {
+lib\services\notification_service.dart:112:  Future<void> scheduleNotification({
+lib\services\ocr_service.dart:3:// class OCRService {
+lib\services\ocr_service.dart:6://   Future<Map<String, dynamic>> scanDocument(String imagePath) async {
+lib\services\ocr_service.dart:60://   void dispose() {
+lib\services\ocr_service.dart:65:class OCRService {
+lib\services\ocr_service.dart:69:  Future<Map<String, String?>> analyzeDocument(String imagePath) async {
+lib\services\ocr_service.dart:107:  void dispose() {
+lib\views\add_document_screen.dart:10:class AddDocumentScreen extends StatefulWidget {
+lib\views\add_document_screen.dart:20:class _AddDocumentScreenState extends State<AddDocumentScreen> {
+lib\views\add_document_screen.dart:35:  void initState() {
+lib\views\add_document_screen.dart:37:    if (widget.existingDoc != null) {
+lib\views\add_document_screen.dart:38:      _nameController.text = widget.existingDoc!['name'] ?? '';
+lib\views\add_document_screen.dart:39:      _dateController.text = widget.existingDoc!['expiration_date'] ?? '';
+lib\views\add_document_screen.dart:40:      _notificationsEnabled = widget.existingDoc!['is_active'] == 1;
+lib\views\add_document_screen.dart:42:      String savedType = widget.existingDoc!['doc_type'] ?? 'Pasaporte';
+lib\views\add_document_screen.dart:52:  Future<void> _saveDoc() async {
+lib\views\add_document_screen.dart:55:    final String docId = widget.existingDoc != null
+lib\views\add_document_screen.dart:56:        ? widget.existingDoc!['id']
+lib\views\add_document_screen.dart:79:      'parent_id': widget.parentId,
+lib\views\add_document_screen.dart:82:    if (widget.existingDoc != null) {
+lib\views\add_document_screen.dart:107:  Widget build(BuildContext context) {
+lib\views\add_document_screen.dart:178:  Future<void> _selectDate(BuildContext context) async {
+lib\views\add_document_screen.dart:196:  Future<void> _pickAndScanImage() async {
+lib\views\camera_scanner_screen.dart:5:class CameraScannerScreen extends StatefulWidget {
+lib\views\camera_scanner_screen.dart:12:class _CameraScannerScreenState extends State<CameraScannerScreen> {
+lib\views\camera_scanner_screen.dart:17:  void initState() {
+lib\views\camera_scanner_screen.dart:22:  Future<void> _initCamera() async {
+lib\views\camera_scanner_screen.dart:32:  Future<void> _takePictureAndScan() async {
+lib\views\camera_scanner_screen.dart:53:  void dispose() {
+lib\views\camera_scanner_screen.dart:59:  Widget build(BuildContext context) {
+lib\views\home_screen.dart:11:class HomeScreen extends StatefulWidget {
+lib\views\home_screen.dart:18:class _HomeScreenState extends State<HomeScreen> {
+lib\views\home_screen.dart:32:  void initState() {
+lib\views\home_screen.dart:40:  Future<void> _refreshItems() async {
+lib\views\home_screen.dart:90:  void _goBack() {
+lib\views\home_screen.dart:100:  Widget _buildFilterChips() {
+lib\views\home_screen.dart:139:  // Future<void> _searchDocuments(String query) async {
+lib\views\home_screen.dart:178:  Widget _buildItemRow(FollowItem item) {
+lib\views\home_screen.dart:284:  void _showFolderDialog({Map<String, dynamic>? existingFolder}) {
+lib\views\home_screen.dart:331:  void _showCreateOptions() {
+lib\views\home_screen.dart:365:  Widget build(BuildContext context) {
+lib\widgets\item_tile.dart:5:class ItemTile extends StatelessWidget {
+lib\widgets\item_tile.dart:7:  final VoidCallback onTap;
+lib\widgets\item_tile.dart:12:  Widget build(BuildContext context) {
+test\database_test.dart:5:void main() {
+test\folder_validation_test.dart:10:void main() {
+test\unit_test.dart:3:// void main() {
+test\unit_test.dart:40:void main() {
+test\widget_test.dart:6:void main() {
+test\widget_test.dart:11:  testWidgets('Validación de flujo: Inicio y Buscador',
+test\widget_test.dart:12:      (WidgetTester tester) async {
+test\widget_test.dart:14:    await tester.pumpWidget(const MyApp());
+test\widget_test.dart:26:    // Buscamos cualquier widget que contenga la palabra "Principal"
+test\widget_test.dart:42:      expect(find.text('Test'), findsOneWidget);
+test\widget_test.dart:48:// void main() {
+test\widget_test.dart:49://   TestWidgetsFlutterBinding.ensureInitialized();
+test\widget_test.dart:54://   testWidgets('1. Carga de Pantalla Principal', (WidgetTester tester) async {
+test\widget_test.dart:55://     await tester.pumpWidget(const MyApp()); // [cite: 2]
+test\widget_test.dart:69://   testWidgets('2. Apertura del Buscador', (WidgetTester tester) async {
+test\widget_test.dart:70://     await tester.pumpWidget(const MyApp());
+test\widget_test.dart:82://   testWidgets('3. Escritura en Buscador', (WidgetTester tester) async {
+test\widget_test.dart:83://     await tester.pumpWidget(const MyApp());
+test\widget_test.dart:94://       expect(find.text('Test'), findsOneWidget); // [cite: 7]
+

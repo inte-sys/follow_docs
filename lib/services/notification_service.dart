@@ -108,4 +108,35 @@ class NotificationService {
     // Se usa la instancia de la clase, no la clase directamente
     await _notifications.cancel(id.hashCode);
   }
+
+  Future<void> scheduleNotification({
+    required int id,
+    required String title,
+    required String body,
+    required DateTime scheduledDate,
+  }) async {
+    // Calculamos la fecha de la alerta (7 días antes del vencimiento)
+    final notificationDate = scheduledDate.subtract(const Duration(days: 7));
+
+    // Si la fecha de aviso ya pasó, no programamos nada
+    if (notificationDate.isBefore(DateTime.now())) return;
+
+    await _notifications.zonedSchedule(
+      id,
+      title,
+      body,
+      tz.TZDateTime.from(notificationDate, tz.local),
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'vencimientos_channel',
+          'Vencimientos',
+          importance: Importance.max,
+          priority: Priority.high,
+        ),
+      ),
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
+    );
+  }
 }

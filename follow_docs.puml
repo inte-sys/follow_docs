@@ -1,0 +1,203 @@
+@startuml
+set namespaceSeparator ::
+
+class "follow_docs::main.dart::MyApp" {
+  +Widget build()
+}
+
+"flutter::src::widgets::framework.dart::StatelessWidget" <|-- "follow_docs::main.dart::MyApp"
+
+class "follow_docs::main.dart::InitializerScreen" {
+  +State<InitializerScreen> createState()
+}
+
+"flutter::src::widgets::framework.dart::StatefulWidget" <|-- "follow_docs::main.dart::InitializerScreen"
+
+class "follow_docs::main.dart::_InitializerScreenState" {
+  -String _statusMessage
+  -bool _hasError
+  -String _errorMessage
+  +void initState()
+  -dynamic _initializeApp()
+  +Widget build()
+}
+
+"flutter::src::widgets::framework.dart::State" <|-- "follow_docs::main.dart::_InitializerScreenState"   
+
+class "follow_docs::models::item_model.dart::FollowItem" {
+  +String id
+  +String name
+  +ItemType type
+  +DateTime? expirationDate
+  +bool isActive
+  +String expirationHint
+  +bool isExpired
+}
+
+"follow_docs::models::item_model.dart::FollowItem" o-- "follow_docs::models::item_model.dart::ItemType"
+
+class "follow_docs::models::item_model.dart::ItemType" {
+  +int index
+  {static} +List<ItemType> values
+  {static} +ItemType folder
+  {static} +ItemType document
+}
+
+"follow_docs::models::item_model.dart::ItemType" o-- "follow_docs::models::item_model.dart::ItemType"
+"dart::core::Enum" <|-- "follow_docs::models::item_model.dart::ItemType"
+
+class "follow_docs::models::reminder_model.dart::ReminderConfig" {
+  +ReminderType type
+  +int value
+  +String unit
+}
+
+"follow_docs::models::reminder_model.dart::ReminderConfig" o-- "follow_docs::models::reminder_model.dart::ReminderType"
+
+class "follow_docs::models::reminder_model.dart::ReminderType" {
+  +int index
+  {static} +List<ReminderType> values
+  {static} +ReminderType notification
+  {static} +ReminderType email
+  {static} +ReminderType calendar
+}
+
+"follow_docs::models::reminder_model.dart::ReminderType" o-- "follow_docs::models::reminder_model.dart::ReminderType"
+"dart::core::Enum" <|-- "follow_docs::models::reminder_model.dart::ReminderType"
+
+class "follow_docs::services::database_helper.dart::DatabaseHelper" {
+  {static} +DatabaseHelper instance
+  {static} -Database? _database
+  +dynamic database
+  -dynamic _initDB()
+  -dynamic _createDB()
+  +dynamic insertItem()
+  +dynamic queryAllItems()
+  +dynamic updateItem()
+  +dynamic deleteItem()
+  +dynamic queryItemsByParent()
+  +dynamic getItems()
+}
+
+"follow_docs::services::database_helper.dart::DatabaseHelper" o-- "follow_docs::services::database_helper.dart::DatabaseHelper"
+"follow_docs::services::database_helper.dart::DatabaseHelper" o-- "sqflite_common::sqlite_api.dart::Database"
+
+class "follow_docs::services::notification_service.dart::NotificationService" {
+  {static} -NotificationService _instance
+  -FlutterLocalNotificationsPlugin _notifications
+  +dynamic init()
+  -dynamic _configureLocalTimeZone()
+  +dynamic scheduleExpirationNotice()
+  +dynamic showInstantNotification()
+  +dynamic cancelNotification()
+  +dynamic scheduleNotification()
+}
+
+"follow_docs::services::notification_service.dart::NotificationService" o-- "follow_docs::services::notification_service.dart::NotificationService"
+"follow_docs::services::notification_service.dart::NotificationService" o-- "flutter_local_notifications::src::flutter_local_notifications_plugin.dart::FlutterLocalNotificationsPlugin"
+
+class "follow_docs::services::ocr_service.dart::OCRService" {
+  -TextRecognizer _textRecognizer
+  +dynamic analyzeDocument()
+  +void dispose()
+}
+
+"follow_docs::services::ocr_service.dart::OCRService" o-- "google_mlkit_text_recognition::src::text_recognizer.dart::TextRecognizer"        
+
+class "follow_docs::views::add_document_screen.dart::AddDocumentScreen" {
+  +Map<String, dynamic>? existingDoc
+  +String? parentId
+  +State<AddDocumentScreen> createState()
+}
+
+"flutter::src::widgets::framework.dart::StatefulWidget" <|-- "follow_docs::views::add_document_screen.dart::AddDocumentScreen"
+
+class "follow_docs::views::add_document_screen.dart::_AddDocumentScreenState" {
+  -TextEditingController _nameController
+  -TextEditingController _dateController
+  -TextEditingController _customTypeController
+  -String _selectedType
+  -bool _notificationsEnabled
+  -List<String> _docTypes
+  +MaskTextInputFormatter dateMaskFormatter
+  +void initState()
+  -dynamic _saveDoc()
+  +Widget build()
+  -dynamic _selectDate()
+  -dynamic _pickAndScanImage()
+}
+
+"follow_docs::views::add_document_screen.dart::_AddDocumentScreenState" o-- "flutter::src::widgets::editable_text.dart::TextEditingController"
+"follow_docs::views::add_document_screen.dart::_AddDocumentScreenState" o-- "mask_text_input_formatter::mask_text_input_formatter.dart::MaskTextInputFormatter"
+"flutter::src::widgets::framework.dart::State" <|-- "follow_docs::views::add_document_screen.dart::_AddDocumentScreenState"
+
+class "follow_docs::views::camera_scanner_screen.dart::CameraScannerScreen" {
+  +State<CameraScannerScreen> createState()
+}
+
+"flutter::src::widgets::framework.dart::StatefulWidget" <|-- "follow_docs::views::camera_scanner_screen.dart::CameraScannerScreen"
+
+class "follow_docs::views::camera_scanner_screen.dart::_CameraScannerScreenState" {
+  -CameraController? _controller
+  -bool _isProcessing
+  +void initState()
+  -dynamic _initCamera()
+  -dynamic _takePictureAndScan()
+  +void dispose()
+  +Widget build()
+}
+
+"follow_docs::views::camera_scanner_screen.dart::_CameraScannerScreenState" o-- "camera::src::camera_controller.dart::CameraController"     
+"flutter::src::widgets::framework.dart::State" <|-- "follow_docs::views::camera_scanner_screen.dart::_CameraScannerScreenState"
+
+class "follow_docs::views::home_screen.dart::HomeScreen" {
+  +State<HomeScreen> createState()
+}
+
+"flutter::src::widgets::framework.dart::StatefulWidget" <|-- "follow_docs::views::home_screen.dart::HomeScreen"
+
+class "follow_docs::views::home_screen.dart::_HomeScreenState" {
+  -List<FollowItem> _items
+  -List<Map<String, dynamic>> _rawItems
+  -List<Map<String, String?>> _navigationStack
+  -TextEditingController _searchController
+  -bool _isSearching
+  -DocFilter _activeFilter
+  -Map<String, String?> _currentLevel
+  +void initState()
+  -dynamic _refreshItems()
+  -void _goBack()
+  -Widget _buildFilterChips()
+  -Widget _buildItemRow()
+  -void _showFolderDialog()
+  -void _showCreateOptions()
+  +Widget build()
+}
+
+"follow_docs::views::home_screen.dart::_HomeScreenState" o-- "flutter::src::widgets::editable_text.dart::TextEditingController"
+"follow_docs::views::home_screen.dart::_HomeScreenState" o-- "follow_docs::views::home_screen.dart::DocFilter"
+"flutter::src::widgets::framework.dart::State" <|-- "follow_docs::views::home_screen.dart::_HomeScreenState"
+
+class "follow_docs::views::home_screen.dart::DocFilter" {
+  +int index
+  {static} +List<DocFilter> values
+  {static} +DocFilter all
+  {static} +DocFilter upcoming
+  {static} +DocFilter expired
+}
+
+"follow_docs::views::home_screen.dart::DocFilter" o-- "follow_docs::views::home_screen.dart::DocFilter"
+"dart::core::Enum" <|-- "follow_docs::views::home_screen.dart::DocFilter"
+
+class "follow_docs::widgets::item_tile.dart::ItemTile" {
+  +FollowItem item
+  +void Function() onTap
+  +Widget build()
+}
+
+"follow_docs::widgets::item_tile.dart::ItemTile" o-- "follow_docs::models::item_model.dart::FollowItem"
+"follow_docs::widgets::item_tile.dart::ItemTile" o-- "dart::ui::void Function()"
+"flutter::src::widgets::framework.dart::StatelessWidget" <|-- "follow_docs::widgets::item_tile.dart::ItemTile"
+
+
+@enduml
