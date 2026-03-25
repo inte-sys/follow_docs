@@ -1,471 +1,3 @@
-// import 'package:flutter/material.dart';
-// import 'package:intl/intl.dart';
-// import '../services/database_helper.dart';
-// import '../services/notification_service.dart';
-// import '../models/item_model.dart';
-// import 'add_document_screen.dart';
-// import 'package:uuid/uuid.dart';
-// // import 'package:flutter/services.dart';
-
-// enum DocFilter { all, upcoming, expired }
-
-// class HomeScreen extends StatefulWidget {
-//   const HomeScreen({super.key});
-
-//   @override
-//   State<HomeScreen> createState() => _HomeScreenState();
-// }
-
-// class _HomeScreenState extends State<HomeScreen> {
-//   List<FollowItem> _items = [];
-//   List<Map<String, dynamic>> _rawItems = [];
-
-//   // Pila de navegación para gestionar niveles de carpetas y títulos
-//   final List<Map<String, String?>> _navigationStack = [
-//     {'id': null, 'name': 'Principal'}
-//   ];
-
-//   final _searchController = TextEditingController();
-//   bool _isSearching = false;
-//   DocFilter _activeFilter = DocFilter.all;
-
-//   @override
-//   void initState() {
-//     super.initState();
-//     _refreshItems();
-//   }
-
-//   // Getter para obtener el nivel actual de la pila
-//   Map<String, String?> get _currentLevel => _navigationStack.last;
-
-//   Future<void> _refreshItems() async {
-//     final searchText = _searchController.text.trim();
-
-//     // 1. Obtener datos crudos usando el nuevo método del Helper
-//     final List<Map<String, dynamic>> data =
-//         await DatabaseHelper.instance.getItems(
-//       parentId:
-//           _currentLevel['id'], // Mantiene tu estructura de niveles [cite: 3]
-//       search: searchText.isEmpty ? null : searchText,
-//     );
-
-//     setState(() {
-//       _rawItems = data;
-//       // 2. Mapeo a objetos FollowItem [cite: 6]
-//       _items = data.map((item) {
-//         DateTime? expiry;
-//         if (item['expiration_date'] != null &&
-//             item['expiration_date'].toString().isNotEmpty) {
-//           try {
-//             expiry = DateFormat('dd/MM/yyyy')
-//                 .parse(item['expiration_date'].toString());
-//           } catch (_) {}
-//         }
-//         return FollowItem(
-//           id: item['id']?.toString() ?? '',
-//           name: item['name']?.toString() ?? 'Sin nombre',
-//           type: item['type'] == 'folder' ? ItemType.folder : ItemType.document,
-//           expirationDate: expiry,
-//         );
-//       }).toList();
-
-//       // 3. Preservar tu lógica de filtrado por estado (Vencidos/Próximos) [cite: 7, 8]
-//       if (_activeFilter == DocFilter.expired) {
-//         _items = _items
-//             .where((i) => i.type == ItemType.document && i.isExpired)
-//             .toList();
-//       } else if (_activeFilter == DocFilter.upcoming) {
-//         final now = DateTime.now();
-//         final nextWeek = now.add(const Duration(days: 7));
-//         _items = _items.where((i) {
-//           if (i.type != ItemType.document || i.expirationDate == null) {
-//             return false;
-//           }
-//           return i.expirationDate!.isAfter(now) &&
-//               i.expirationDate!.isBefore(nextWeek);
-//         }).toList();
-//       }
-//     });
-//   }
-
-//   void _goBack() {
-//     if (_navigationStack.length > 1) {
-//       setState(() {
-//         _navigationStack.removeLast();
-//         _activeFilter = DocFilter.all; // Resetear filtro al navegar
-//       });
-//       _refreshItems();
-//     }
-//   }
-
-//   Widget _buildFilterChips() {
-//     return Container(
-//       height: 50,
-//       padding: const EdgeInsets.symmetric(horizontal: 12),
-//       child: ListView(
-//         scrollDirection: Axis.horizontal,
-//         children: [
-//           FilterChip(
-//             label: const Text("Todos"),
-//             selected: _activeFilter == DocFilter.all,
-//             onSelected: (val) {
-//               setState(() => _activeFilter = DocFilter.all);
-//               _refreshItems();
-//             },
-//           ),
-//           const SizedBox(width: 8),
-//           FilterChip(
-//             label: const Text("Próximos (7d)"),
-//             selected: _activeFilter == DocFilter.upcoming,
-//             onSelected: (val) {
-//               setState(() => _activeFilter = DocFilter.upcoming);
-//               _refreshItems();
-//             },
-//           ),
-//           const SizedBox(width: 8),
-//           FilterChip(
-//             label: const Text("Vencidos"),
-//             selected: _activeFilter == DocFilter.expired,
-//             selectedColor: Colors.red.shade100,
-//             onSelected: (val) {
-//               setState(() => _activeFilter = DocFilter.expired);
-//               _refreshItems();
-//             },
-//           ),
-//         ],
-//       ),
-//     );
-//   }
-
-//   // Future<void> _searchDocuments(String query) async {
-//   //   if (query.isEmpty) {
-//   //     _refreshItems();
-//   //     return;
-//   //   }
-
-//   //   // Consulta global para la búsqueda
-//   //   final allData = await DatabaseHelper.instance.queryAllItems();
-
-//   //   setState(() {
-//   //     // IMPORTANTE: Actualizamos _rawItems con los resultados de la búsqueda
-//   //     // para que _buildItemRow encuentre el documento original al editar.
-//   //     _rawItems = allData
-//   //         .where((item) =>
-//   //             item['type'] == 'document' &&
-//   //             item['name']
-//   //                 .toString()
-//   //                 .toLowerCase()
-//   //                 .contains(query.toLowerCase()))
-//   //         .toList();
-
-//   //     _items = _rawItems.map((item) {
-//   //       DateTime? expiry;
-//   //       if (item['expiration_date'] != null) {
-//   //         try {
-//   //           expiry = DateFormat('dd/MM/yyyy')
-//   //               .parse(item['expiration_date'].toString());
-//   //         } catch (_) {}
-//   //       }
-//   //       return FollowItem(
-//   //         id: item['id'].toString(),
-//   //         name: item['name'].toString(),
-//   //         type: ItemType.document,
-//   //         expirationDate: expiry,
-//   //       );
-//   //     }).toList();
-//   //   });
-//   // }
-
-//   Widget _buildItemRow(FollowItem item) {
-//     final Map<String, dynamic> rawDoc = _rawItems.firstWhere(
-//       (element) => element['id'] == item.id,
-//       orElse: () => {},
-//     );
-
-//     return Padding(
-//       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-//       child: Dismissible(
-//         key: Key(item.id),
-//         direction: DismissDirection.endToStart,
-//         // Inicio del bloque de confirmación
-//         confirmDismiss: (direction) async {
-//           return await showDialog(
-//             context: context,
-//             builder: (BuildContext context) {
-//               return AlertDialog(
-//                 title: const Text("Confirmar eliminación"),
-//                 content: Text(
-//                     "¿Deseas borrar '${item.name}'? Esta acción no se puede deshacer."),
-//                 actions: [
-//                   TextButton(
-//                     onPressed: () => Navigator.of(context).pop(false),
-//                     child: const Text("CANCELAR"),
-//                   ),
-//                   TextButton(
-//                     onPressed: () => Navigator.of(context).pop(true),
-//                     child: const Text("ELIMINAR",
-//                         style: TextStyle(color: Colors.red)),
-//                   ),
-//                 ],
-//               );
-//             },
-//           );
-//         },
-//         // Fin del bloque de confirmación
-//         background: Container(
-//           decoration: BoxDecoration(
-//               color: Colors.red.shade400,
-//               borderRadius: BorderRadius.circular(12)),
-//           alignment: Alignment.centerRight,
-//           padding: const EdgeInsets.only(right: 20),
-//           child: const Icon(Icons.delete_sweep, color: Colors.white, size: 28),
-//         ),
-//         onDismissed: (_) async {
-//           await DatabaseHelper.instance.deleteItem(item.id);
-//           _refreshItems();
-//         },
-//         child: Card(
-//           child: ListTile(
-//             leading: CircleAvatar(
-//               backgroundColor: item.type == ItemType.folder
-//                   ? Colors.amber.shade100
-//                   : (item.isExpired
-//                       ? Colors.red.shade100
-//                       : Colors.blue.shade100),
-//               child: Icon(
-//                 item.type == ItemType.folder ? Icons.folder : Icons.description,
-//                 color: item.type == ItemType.folder
-//                     ? Colors.amber.shade800
-//                     : (item.isExpired
-//                         ? Colors.red.shade800
-//                         : Colors.blue.shade800),
-//               ),
-//             ),
-//             title: Text(item.name,
-//                 style: const TextStyle(fontWeight: FontWeight.w600)),
-//             subtitle: item.expirationDate != null
-//                 ? Text(
-//                     "Vence: ${DateFormat('dd/MM/yyyy').format(item.expirationDate!)}",
-//                     style: TextStyle(
-//                         color:
-//                             item.isExpired ? Colors.red : Colors.grey.shade600))
-//                 : const Text("Carpeta"),
-//             trailing: Row(
-//               mainAxisSize: MainAxisSize.min,
-//               children: [
-//                 // Campana de prueba: dispara una notificación instantánea al hacer tap
-//                 IconButton(
-//                   icon: Icon(
-//                     item.isActive
-//                         ? Icons.notifications_active
-//                         : Icons.notifications_none,
-//                     color: item.isActive ? Colors.blue : Colors.grey,
-//                     size: 22,
-//                   ),
-//                   tooltip: 'Probar notificación instantánea',
-//                   onPressed: () async {
-//                     // Disparo manual para validar recepción en el OS
-//                     await NotificationService().showInstantNotification(
-//                       // id: item.id.hashCode,
-//                       // title: "Prueba de Alerta: ${item.name}",
-//                       // body:
-//                       //     "Si recibes esto, el sistema de notificaciones está operativo en este terminal.",
-//                       "Prueba de Alerta: ${item.name}",
-//                     );
-//                   },
-//                 ),
-//                 // Botón de edición existente
-//                 IconButton(
-//                   icon: const Icon(Icons.edit_note),
-//                   onPressed: () async {
-//                     final res = await Navigator.push(
-//                       context,
-//                       MaterialPageRoute(
-//                         builder: (_) => AddDocumentScreen(
-//                           existingDoc: rawDoc,
-//                           parentId:
-//                               _isSearching || _activeFilter != DocFilter.all
-//                                   ? rawDoc['parent_id']
-//                                   : _currentLevel['id'],
-//                         ),
-//                       ),
-//                     );
-//                     if (res == true) _refreshItems();
-//                   },
-//                 ),
-//               ],
-//             ),
-//             onTap: () {
-//               if (item.type == ItemType.folder) {
-//                 setState(() {
-//                   _navigationStack.add({'id': item.id, 'name': item.name});
-//                   _activeFilter = DocFilter.all;
-//                 });
-//                 _refreshItems();
-//               }
-//             },
-//           ),
-//         ),
-//       ),
-//     );
-//   }
-
-//   void _showFolderDialog({Map<String, dynamic>? existingFolder}) {
-//     final TextEditingController folderController = TextEditingController(
-//         text: existingFolder != null ? existingFolder['name'] : '');
-//     showDialog(
-//       context: context,
-//       builder: (context) => AlertDialog(
-//         title:
-//             Text(existingFolder == null ? "Nueva Carpeta" : "Editar Carpeta"),
-//         content: TextField(
-//           controller: folderController,
-//           maxLength: 32,
-//         ),
-//         actions: [
-//           TextButton(
-//               onPressed: () => Navigator.pop(context),
-//               child: const Text("Cancelar")),
-//           ElevatedButton(
-//             onPressed: () async {
-//               if (folderController.text.trim().isNotEmpty) {
-//                 if (existingFolder == null) {
-//                   await DatabaseHelper.instance.insertItem({
-//                     'id': const Uuid().v4(),
-//                     'name': folderController.text.trim(),
-//                     'type': 'folder',
-//                     'is_active': 1,
-//                     'parent_id': _currentLevel['id'],
-//                   });
-//                 } else {
-//                   await DatabaseHelper.instance.updateItem({
-//                     'id': existingFolder['id'],
-//                     'name': folderController.text.trim(),
-//                     'type': 'folder',
-//                     'is_active': 1,
-//                   });
-//                 }
-//                 if (!context.mounted) return;
-//                 Navigator.pop(context);
-//                 _refreshItems();
-//               }
-//             },
-//             child: Text(existingFolder == null ? "Crear" : "Guardar"),
-//           ),
-//         ],
-//       ),
-//     );
-//   }
-
-//   void _showCreateOptions() {
-//     showModalBottomSheet(
-//       context: context,
-//       builder: (context) => Column(
-//         mainAxisSize: MainAxisSize.min,
-//         children: [
-//           ListTile(
-//             leading: const Icon(Icons.create_new_folder),
-//             title: const Text("Crear Carpeta"),
-//             onTap: () {
-//               Navigator.pop(context);
-//               _showFolderDialog();
-//             },
-//           ),
-//           ListTile(
-//             leading: const Icon(Icons.description),
-//             title: const Text("Crear Elemento"),
-//             onTap: () async {
-//               Navigator.pop(context);
-//               final res = await Navigator.push(
-//                   context,
-//                   MaterialPageRoute(
-//                       builder: (_) => AddDocumentScreen(
-//                             parentId: _currentLevel['id'],
-//                           )));
-//               if (res == true) _refreshItems();
-//             },
-//           ),
-//         ],
-//       ),
-//     );
-//   }
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return PopScope(
-//       canPop: _navigationStack.length <= 1,
-//       onPopInvokedWithResult: (didPop, result) {
-//         if (didPop) return;
-//         _goBack();
-//       },
-//       child: Scaffold(
-//         appBar: AppBar(
-//           title: _isSearching
-//               // ? TextField(
-//               //     controller: _searchController,
-//               //     autofocus: true,
-//               //     style: const TextStyle(color: Colors.white),
-//               //     decoration: const InputDecoration(
-//               //         hintText: "Buscar...",
-//               //         hintStyle: TextStyle(color: Colors.white70),
-//               //         border: InputBorder.none),
-//               //     onChanged: (q) =>
-//               //         _refreshItems(), // Simplificado para usar la misma lógica
-//               //   )
-//               ? TextField(
-//                   controller: _searchController,
-//                   autofocus: true,
-//                   style: const TextStyle(
-//                       color: Colors.black, fontSize: 18), // Texto visible
-//                   decoration: const InputDecoration(
-//                     hintText: "Buscar documento...",
-//                     hintStyle: TextStyle(color: Colors.black), // Hint visible
-//                     border: InputBorder.none,
-//                   ),
-//                   onChanged: (q) =>
-//                       _refreshItems(), // Al usar el filtro unificado, esto debe disparar la búsqueda{
-//                   // { _refreshItems(); // Al usar el filtro unificado, esto debe disparar la búsqueda
-//                   // },
-//                 )
-//               : Column(
-//                   crossAxisAlignment: CrossAxisAlignment.start,
-//                   children: [
-//                     const Text("Follow Docs", style: TextStyle(fontSize: 12)),
-//                     Text(_currentLevel['name']!,
-//                         style: const TextStyle(
-//                             fontSize: 18, fontWeight: FontWeight.bold)),
-//                   ],
-//                 ),
-//           actions: [
-//             IconButton(
-//               icon: Icon(_isSearching ? Icons.close : Icons.search),
-//               onPressed: () => setState(() => _isSearching = !_isSearching),
-//             ),
-//           ],
-//         ),
-//         body: Column(
-//           children: [
-//             if (!_isSearching) _buildFilterChips(),
-//             Expanded(
-//               child: RefreshIndicator(
-//                 onRefresh: _refreshItems,
-//                 child: ListView.builder(
-//                   itemCount: _items.length,
-//                   itemBuilder: (context, index) => _buildItemRow(_items[index]),
-//                 ),
-//               ),
-//             ),
-//           ],
-//         ),
-//         floatingActionButton: FloatingActionButton(
-//           onPressed: () => _showCreateOptions(),
-//           child: const Icon(Icons.add),
-//         ),
-//       ),
-//     );
-//   }
-// }
-
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../services/database_helper.dart';
@@ -651,7 +183,8 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             title: Text(item.name,
                 style: const TextStyle(fontWeight: FontWeight.w600)),
-            subtitle: item.expirationDate != null
+            subtitle: item.type == ItemType.document &&
+                    item.expirationDate != null
                 ? Text(
                     "Vence: ${DateFormat('dd/MM/yyyy').format(item.expirationDate!)} (${item.expirationHint})",
                     style: TextStyle(
@@ -661,48 +194,38 @@ class _HomeScreenState extends State<HomeScreen> {
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Campana de prueba: Azul si notifValue > 0, Gris si es 0
-                IconButton(
-                  icon: Icon(
-                    item.notifValue > 0
-                        ? Icons.notifications_active
-                        : Icons.notifications_off,
-                    color: item.notifValue > 0 ? Colors.blue : Colors.grey,
-                    size: 22,
+                if (item.type == ItemType.document)
+                  IconButton(
+                    icon: Icon(
+                      item.notifValue > 0
+                          ? Icons.notifications_active
+                          : Icons.notifications_off,
+                      color: item.notifValue > 0 ? Colors.blue : Colors.grey,
+                      size: 22,
+                    ),
+                    onPressed: () async {
+                      await NotificationService()
+                          .showInstantNotification(item.name);
+                    },
                   ),
-                  tooltip: item.notifValue > 0
-                      ? 'Notificación activa'
-                      : 'Notificación apagada',
-                  onPressed: () async {
-                    await NotificationService()
-                        .showInstantNotification(item.name);
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                              "Prueba de alerta enviada para: ${item.name}"),
-                          duration: const Duration(milliseconds: 800),
-                        ),
-                      );
-                    }
-                  },
-                ),
                 IconButton(
                   icon: const Icon(Icons.edit_note),
                   onPressed: () async {
-                    final res = await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => AddDocumentScreen(
-                          existingDoc: rawDoc,
-                          parentId:
-                              _isSearching || _activeFilter != DocFilter.all
-                                  ? rawDoc['parent_id']
-                                  : _currentLevel['id'],
+                    // Si es carpeta, abrir el diálogo de carpeta. Si no, la pantalla de documento.
+                    if (item.type == ItemType.folder) {
+                      _showFolderDialog(existingFolder: rawDoc);
+                    } else {
+                      final res = await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => AddDocumentScreen(
+                            existingDoc: rawDoc,
+                            parentId: rawDoc['parent_id'],
+                          ),
                         ),
-                      ),
-                    );
-                    if (res == true) _refreshItems();
+                      );
+                      if (res == true) _refreshItems();
+                    }
                   },
                 ),
               ],
@@ -732,7 +255,11 @@ class _HomeScreenState extends State<HomeScreen> {
             Text(existingFolder == null ? "Nueva Carpeta" : "Editar Carpeta"),
         content: TextField(
           controller: folderController,
-          maxLength: 32,
+          maxLength: 32, // Límite de 32 caracteres para carpetas
+          decoration: const InputDecoration(
+            labelText: "Nombre de la carpeta",
+            counterText: "",
+          ),
         ),
         actions: [
           TextButton(
@@ -755,6 +282,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     'name': folderController.text.trim(),
                     'type': 'folder',
                     'is_active': 1,
+                    'parent_id': existingFolder['parent_id'],
                   });
                 }
                 if (!context.mounted) return;
@@ -785,7 +313,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           ListTile(
             leading: const Icon(Icons.description),
-            title: const Text("Crear Elemento"),
+            title: const Text("Crear Documento"),
             onTap: () async {
               Navigator.pop(context);
               final res = await Navigator.push(
@@ -816,11 +344,13 @@ class _HomeScreenState extends State<HomeScreen> {
               ? TextField(
                   controller: _searchController,
                   autofocus: true,
+                  maxLength: 64, // Límite de 64 caracteres en búsqueda
                   style: const TextStyle(color: Colors.black, fontSize: 18),
                   decoration: const InputDecoration(
                     hintText: "Buscar documento...",
                     hintStyle: TextStyle(color: Colors.black54),
                     border: InputBorder.none,
+                    counterText: "",
                   ),
                   onChanged: (q) => _refreshItems(),
                 )

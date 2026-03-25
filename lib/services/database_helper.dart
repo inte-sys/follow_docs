@@ -31,8 +31,8 @@ class DatabaseHelper {
         CREATE TABLE items (
           id TEXT PRIMARY KEY,
           name TEXT NOT NULL,
-          type TEXT NOT NULL,
-          doc_type TEXT,
+          type TEXT NOT NULL, -- 'folder' o 'document'
+          doc_type TEXT,      -- 'Pasaporte', 'Licencia', etc.
           expiration_date TEXT,
           is_active INTEGER DEFAULT 1,
           parent_id TEXT,
@@ -51,13 +51,6 @@ class DatabaseHelper {
     return await db.insert('items', row);
   }
 
-  Future<List<Map<String, dynamic>>> queryAllItems() async {
-    Database db = await instance.database;
-    // Ordenamos carpetas primero
-    return await db.query('items', orderBy: "type DESC, name ASC");
-  }
-
-// Añade estos métodos si no los tienes
   Future<int> updateItem(Map<String, dynamic> row) async {
     Database db = await instance.database;
     String id = row['id'];
@@ -69,39 +62,26 @@ class DatabaseHelper {
     return await db.delete('items', where: 'id = ?', whereArgs: [id]);
   }
 
-  // Nuevo método para consultar contenido de una carpeta específica
-  Future<List<Map<String, dynamic>>> queryItemsByParent(
-      String? parentId) async {
-    Database db = await instance.database;
-    return await db.query(
-      'items',
-      where: parentId == null ? 'parent_id IS NULL' : 'parent_id = ?',
-      whereArgs: parentId == null ? [] : [parentId],
-      // 'folder' viene antes que 'document' alfabéticamente.
-      // LOWER(name) garantiza orden A-Z sin importar mayúsculas.
-      orderBy: "type = 'document' ASC, LOWER(name) ASC",
-    );
-  }
-
+  /// Consulta principal que maneja navegación por carpetas y búsqueda global
   Future<List<Map<String, dynamic>>> getItems(
       {String? parentId, String? search}) async {
     final db = await instance.database;
 
     if (search != null && search.isNotEmpty) {
-      // Si hay búsqueda, ignora la carpeta actual para encontrar el archivo en cualquier lugar
+      // Búsqueda global (ignora carpetas para encontrar el archivo)
       return await db.query(
         'items',
         where: 'name LIKE ?',
         whereArgs: ['%$search%'],
-        orderBy: 'type DESC, name ASC',
+        orderBy: 'type DESC, LOWER(name) ASC',
       );
     } else {
-      // Lógica normal de navegación por carpetas
+      // Navegación normal dentro de una carpeta específica
       return await db.query(
         'items',
         where: parentId == null ? 'parent_id IS NULL' : 'parent_id = ?',
         whereArgs: parentId == null ? [] : [parentId],
-        orderBy: 'type DESC, name ASC',
+        orderBy: 'type DESC, LOWER(name) ASC',
       );
     }
   }
