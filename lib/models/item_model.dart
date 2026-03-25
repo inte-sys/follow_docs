@@ -1,50 +1,3 @@
-// // import 'package:flutter/material.dart';
-
-// enum ItemType { folder, document }
-
-// class FollowItem {
-//   final String id;
-//   final String name;
-//   final ItemType type;
-//   final DateTime? expirationDate;
-//   final bool isActive;
-
-//   FollowItem({
-//     required this.id,
-//     required this.name,
-//     required this.type,
-//     this.expirationDate,
-//     this.isActive = true,
-//   });
-
-//   // Regla [10, 11, 12]: Cálculo de la pista de vencimiento
-//   String get expirationHint {
-//     if (expirationDate == null) return "";
-//     final now = DateTime.now();
-//     final difference = expirationDate!.difference(now);
-//     final days = difference.inDays;
-
-//     if (days == 0) return "Hoy";
-//     if (days == 1) return "Mañana";
-//     if (days == -1) return "Ayer";
-
-//     if (days.abs() < 30) {
-//       return "${days.abs()} días";
-//     } else if (days.abs() < 365) {
-//       double weeks = days.abs() / 7;
-//       String prefix = (weeks - weeks.floor() > 0.5) ? "+" : "";
-//       return "$prefix${weeks.floor()} semanas";
-//     } else {
-//       double years = days.abs() / 365;
-//       String prefix = (years - years.floor() > 0.5) ? "+" : "";
-//       return "$prefix${years.floor()} años";
-//     }
-//   }
-
-//   bool get isExpired =>
-//       expirationDate != null && expirationDate!.isBefore(DateTime.now());
-// }
-
 enum ItemType { folder, document }
 
 class FollowItem {
@@ -52,9 +5,8 @@ class FollowItem {
   final String name;
   final ItemType type;
   final DateTime? expirationDate;
-  final bool isActive;
-  // Nuevos campos para la configuración de alertas
-  final int notifValue;
+  final bool isActive; // El elemento está activo en la lista
+  final int notifValue; // 0 significa notificaciones APAGADAS
   final String notifUnit;
 
   FollowItem({
@@ -63,11 +15,13 @@ class FollowItem {
     required this.type,
     this.expirationDate,
     this.isActive = true,
-    this.notifValue = 7,
+    this.notifValue = 0,
     this.notifUnit = 'Días',
   });
 
-  // Convierte un registro de la base de datos (Map) a un objeto FollowItem
+  // Determina si las notificaciones están encendidas para este item
+  bool get isNotifEnabled => notifValue > 0;
+
   factory FollowItem.fromMap(Map<String, dynamic> map) {
     return FollowItem(
       id: map['id'],
@@ -79,12 +33,11 @@ class FollowItem {
               map['expiration_date'].toString().split('/').reversed.join('-'))
           : null,
       isActive: map['is_active'] == 1,
-      notifValue: map['notif_value'] ?? 7,
+      notifValue: map['notif_value'] ?? 0,
       notifUnit: map['notif_unit'] ?? 'Días',
     );
   }
 
-  // Convierte este objeto a un Map para guardarlo en la base de datos
   Map<String, dynamic> toMap() {
     return {
       'id': id,
@@ -99,26 +52,17 @@ class FollowItem {
     };
   }
 
-  // Cálculo de la pista de vencimiento (Regla 10, 11, 12)
   String get expirationHint {
     if (expirationDate == null) return "";
     final now = DateTime.now();
     final difference = expirationDate!.difference(now);
     final days = difference.inDays;
-
     if (days == 0) return "Hoy";
     if (days == 1) return "Mañana";
     if (days == -1) return "Ayer";
-
-    if (days.abs() < 30) {
-      return "${days.abs()} días";
-    } else if (days.abs() < 365) {
-      double weeks = days.abs() / 7;
-      return "${weeks.floor()} semanas";
-    } else {
-      double years = days.abs() / 365;
-      return "${years.floor()} años";
-    }
+    if (days.abs() < 30) return "${days.abs()} días";
+    if (days.abs() < 365) return "${(days.abs() / 7).floor()} semanas";
+    return "${(days.abs() / 365).floor()} años";
   }
 
   bool get isExpired =>

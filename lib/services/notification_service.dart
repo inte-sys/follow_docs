@@ -1,6 +1,6 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
-import 'package:timezone/data/latest.dart' as tz;
+import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:flutter/foundation.dart';
 
@@ -14,6 +14,8 @@ class NotificationService {
 
   Future<void> init() async {
     try {
+      tz_data.initializeTimeZones();
+
       const AndroidInitializationSettings initializationSettingsAndroid =
           AndroidInitializationSettings('@mipmap/launcher_icon');
 
@@ -22,18 +24,18 @@ class NotificationService {
 
       await _notifications.initialize(initializationSettings);
 
-      // Configuramos la zona horaria con un timeout de 3 segundos
+      // SOLUCIÓN: Solicitar permisos para Android 13+
+      await _notifications
+          .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>()
+          ?.requestNotificationsPermission();
+
       await _configureLocalTimeZone().timeout(
         const Duration(seconds: 3),
-        onTimeout: () {
-          debugPrint("Timeout configurando zona horaria, usando fallback.");
-          // Fallback manual inmediato si el sistema no responde
-          tz.setLocalLocation(tz.getLocation('America/New_York'));
-        },
+        onTimeout: () => tz.setLocalLocation(tz.getLocation('UTC')),
       );
     } catch (e) {
-      debugPrint("Error en initNotification: $e");
-      // Aun con error, permitimos que la app continúe
+      debugPrint("Error en init: $e");
     }
   }
 
@@ -88,19 +90,23 @@ class NotificationService {
     }
   }
 
+  // Corregimos este método para asegurar visibilidad inmediata
   Future<void> showInstantNotification(String title) async {
+    const AndroidNotificationDetails androidDetails =
+        AndroidNotificationDetails(
+      'follow_docs_v2', // Usamos el canal v2 que ya viste en los logs
+      'Alertas de Prueba',
+      channelDescription: 'Canal para validación del sistema',
+      importance: Importance.max,
+      priority: Priority.high,
+      fullScreenIntent: true, // Ayuda a que aparezca el banner arriba
+    );
+
     await _notifications.show(
       999,
-      'Prueba Inmediata',
-      'Si ves esto, el canal de $title funciona',
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'follow_docs_v2',
-          'Alertas',
-          importance: Importance.max,
-          priority: Priority.high,
-        ),
-      ),
+      'Prueba de Notificación',
+      'El sistema está activo para: $title',
+      const NotificationDetails(android: androidDetails),
     );
   }
 
