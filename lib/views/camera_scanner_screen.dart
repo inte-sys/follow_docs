@@ -32,7 +32,9 @@ class _CameraScannerScreenState extends State<CameraScannerScreen> {
   Future<void> _takePictureAndScan() async {
     if (_controller == null ||
         !_controller!.value.isInitialized ||
-        _isProcessing) return;
+        _isProcessing) {
+      return;
+    }
 
     setState(() => _isProcessing = true);
 

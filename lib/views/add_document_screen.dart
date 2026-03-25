@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
 import 'package:uuid/uuid.dart';
+import 'dart:async';
 import '../services/database_helper.dart';
 import '../services/notification_service.dart';
 import '../services/ocr_service.dart';
@@ -28,6 +29,10 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
   String _selectedType = 'Pasaporte';
   bool _notificationsEnabled = true;
   String _notifUnit = 'Días';
+  DateTime? _calculatedDate;
+  bool _isPastDocDate = false;
+  bool _showFlash = false;
+  Timer? _correctionTimer;
 
   final List<String> _unitOptions = ['Días', 'Semanas', 'Meses'];
   final List<String> _docTypes = [
@@ -46,6 +51,12 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
   @override
   void initState() {
     super.initState();
+    _initData();
+    _dateController.addListener(_updateCalculations);
+    _notifValueController.addListener(_updateCalculations);
+  }
+
+  void _initData() {
     if (widget.existingDoc != null) {
       _nameController.text = widget.existingDoc!['name'] ?? '';
       _dateController.text = widget.existingDoc!['expiration_date'] ?? '';
@@ -68,30 +79,93 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
         _selectedType = 'Otro';
         _customTypeController.text = savedType;
       }
+      _updateCalculations();
     }
   }
 
-  bool _validateNotifLimits(int value) {
-    if (!_notificationsEnabled) return true;
+  void _updateCalculations() {
+    if (_dateController.text.length < 10) {
+      return;
+    }
 
-    // Límite unificado a 1 año para todas las unidades
-    if (_notifUnit == 'Días' && value > 365) {
-      _showError("El límite es 365 días (1 año)");
-      return false;
+    DateTime? expiryDate;
+    try {
+      expiryDate = DateFormat('dd/MM/yyyy').parse(_dateController.text);
+    } catch (_) {
+      return;
     }
-    if (_notifUnit == 'Semanas' && value > 52) {
-      _showError("El límite es 52 semanas (1 año)");
-      return false;
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    setState(() {
+      _isPastDocDate = expiryDate!.isBefore(today);
+      if (_isPastDocDate) {
+        _notificationsEnabled = false;
+      }
+    });
+
+    if (_isPastDocDate) {
+      return;
     }
-    if (_notifUnit == 'Meses' && value > 12) {
-      _showError("El límite es 12 meses (1 año)");
-      return false;
+
+    int val = int.tryParse(_notifValueController.text) ?? 0;
+    Duration offset = _getDuration(val, _notifUnit);
+    DateTime reminder = expiryDate.subtract(offset);
+
+    setState(() {
+      _calculatedDate = reminder;
+    });
+
+    if (reminder.isBefore(today)) {
+      _triggerCorrection(expiryDate, today);
+    } else {
+      _correctionTimer?.cancel();
+      setState(() {
+        _showFlash = false;
+      });
     }
-    return true;
   }
 
-  void _showError(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  Duration _getDuration(int val, String unit) {
+    if (unit == 'Semanas') {
+      return Duration(days: val * 7);
+    }
+    if (unit == 'Meses') {
+      return Duration(days: val * 30);
+    }
+    return Duration(days: val);
+  }
+
+  void _triggerCorrection(DateTime expiry, DateTime today) {
+    _correctionTimer?.cancel();
+    setState(() {
+      _showFlash = true;
+    });
+
+    _correctionTimer = Timer(const Duration(milliseconds: 1000), () {
+      if (!mounted) {
+        return;
+      }
+
+      final diffDays = expiry.difference(today).inDays;
+
+      setState(() {
+        _showFlash = false;
+
+        if (diffDays >= 30) {
+          _notifUnit = 'Meses';
+          _notifValueController.text = (diffDays / 30).floor().toString();
+        } else if (diffDays >= 7) {
+          _notifUnit = 'Semanas';
+          _notifValueController.text = (diffDays / 7).floor().toString();
+        } else {
+          _notifUnit = 'Días';
+          _notifValueController.text = diffDays.toString();
+        }
+      });
+      _updateCalculations();
+    });
   }
 
   Future<void> _saveDoc() async {
@@ -108,26 +182,25 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
       return;
     }
 
-    int notifValue = int.tryParse(_notifValueController.text) ?? 7;
-    if (!_validateNotifLimits(notifValue)) return;
+    final maxYear = DateTime.now().year + 20;
+    if (expiryDate.year > maxYear) {
+      _showError("La fecha no puede exceder los 20 años (Año $maxYear)");
+      return;
+    }
 
-    int finalNotifValue = _notificationsEnabled ? notifValue : 0;
-    int daysToSubtract = _notifUnit == 'Semanas'
-        ? finalNotifValue * 7
-        : (_notifUnit == 'Meses' ? finalNotifValue * 30 : finalNotifValue);
-
-    final String docId = widget.existingDoc != null
-        ? widget.existingDoc!['id']
-        : const Uuid().v4();
-    final String finalType = _selectedType == 'Otro'
-        ? _customTypeController.text.trim()
-        : _selectedType;
+    int finalNotifValue = _notificationsEnabled
+        ? (int.tryParse(_notifValueController.text) ?? 0)
+        : 0;
 
     final Map<String, dynamic> data = {
-      'id': docId,
+      'id': widget.existingDoc != null
+          ? widget.existingDoc!['id']
+          : const Uuid().v4(),
       'name': _nameController.text.trim(),
       'type': 'document',
-      'doc_type': finalType.isEmpty ? 'Otro' : finalType,
+      'doc_type': _selectedType == 'Otro'
+          ? _customTypeController.text.trim()
+          : _selectedType,
       'expiration_date': _dateController.text,
       'is_active': 1,
       'parent_id': widget.parentId,
@@ -142,49 +215,47 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
         await DatabaseHelper.instance.insertItem(data);
       }
 
-      if (finalNotifValue > 0) {
-        final alarmDate = expiryDate.subtract(Duration(days: daysToSubtract));
-        if (alarmDate.isAfter(DateTime.now())) {
-          await NotificationService().scheduleNotification(
-            id: docId.hashCode,
-            title: "Vencimiento Próximo",
-            body:
-                "Tu ${finalType.toLowerCase()} '${_nameController.text}' vence pronto.",
-            scheduledDate: alarmDate,
-          );
-        }
-      } else {
-        await NotificationService().cancelNotification(docId);
+      if (finalNotifValue > 0 && _calculatedDate != null) {
+        await NotificationService().scheduleNotification(
+          id: data['id'].hashCode,
+          title: "${data['doc_type']}: ${data['name']}",
+          body:
+              "Renovar ${data['name']} antes del ${_dateController.text}. Te lo recordaré el ${DateFormat('dd/MM/yyyy').format(_calculatedDate!)}.",
+          scheduledDate: _calculatedDate!,
+        );
       }
-
-      if (mounted) Navigator.pop(context, true);
+      if (mounted) {
+        Navigator.pop(context, true);
+      }
     } catch (e) {
       _showError("Error al guardar");
     }
   }
 
+  void _showError(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
   Future<void> _pickAndScanImage() async {
-    final String? imagePath = await Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const CameraScannerScreen()),
-    );
-
+    final String? imagePath = await Navigator.push(context,
+        MaterialPageRoute(builder: (_) => const CameraScannerScreen()));
     if (imagePath != null) {
-      final ocr = OCRService();
-      final result = await ocr.analyzeDocument(imagePath);
-      ocr.dispose();
-
+      final result = await OCRService().analyzeDocument(imagePath);
       setState(() {
-        if (result['date'] != null) _dateController.text = result['date']!;
+        if (result['date'] != null) {
+          _dateController.text = result['date']!;
+        }
         if (result['type'] != null && _docTypes.contains(result['type'])) {
           _selectedType = result['type']!;
         }
       });
+      _updateCalculations();
     }
   }
 
   @override
   void dispose() {
+    _correctionTimer?.cancel();
     _nameController.dispose();
     _dateController.dispose();
     _customTypeController.dispose();
@@ -194,6 +265,8 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final todayStr = DateFormat('dd/MM/yyyy').format(DateTime.now());
+
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.existingDoc == null
@@ -209,31 +282,35 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
           children: [
             TextField(
               controller: _nameController,
-              maxLength: 64, // Límite de 64 caracteres
+              maxLength: 64,
               decoration: const InputDecoration(
                   labelText: 'Nombre del documento',
                   border: OutlineInputBorder()),
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
-              value: _selectedType,
+              initialValue: _selectedType,
               items: _docTypes
                   .map((t) => DropdownMenuItem(value: t, child: Text(t)))
                   .toList(),
-              onChanged: (val) => setState(() => _selectedType = val!),
+              onChanged: (val) {
+                setState(() {
+                  _selectedType = val!;
+                });
+              },
               decoration: const InputDecoration(
                   labelText: 'Categoría', border: OutlineInputBorder()),
             ),
-            if (_selectedType == 'Otro') ...[
+            if (_selectedType == 'Otro') ...{
               const SizedBox(height: 16),
               TextField(
                 controller: _customTypeController,
-                maxLength: 20, // Límite de 20 caracteres
+                maxLength: 20,
                 decoration: const InputDecoration(
                     labelText: 'Tipo personalizado',
                     border: OutlineInputBorder()),
               ),
-            ],
+            },
             const SizedBox(height: 16),
             TextFormField(
               controller: _dateController,
@@ -248,44 +325,94 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            SwitchListTile(
-              title: const Text("Notificaciones automáticas"),
-              value: _notificationsEnabled,
-              onChanged: (val) => setState(() => _notificationsEnabled = val),
+            Opacity(
+              opacity: _isPastDocDate ? 0.5 : 1.0,
+              child: IgnorePointer(
+                ignoring: _isPastDocDate,
+                child: SwitchListTile(
+                  title: const Text("Notificaciones automáticas"),
+                  value: _notificationsEnabled,
+                  onChanged: (val) {
+                    setState(() {
+                      _notificationsEnabled = val;
+                    });
+                  },
+                ),
+              ),
             ),
-            if (_notificationsEnabled)
+            if (_notificationsEnabled && !_isPastDocDate) ...{
               Padding(
                 padding: const EdgeInsets.all(8.0),
-                child: Wrap(
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: 8.0,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text("Avisar "),
-                    SizedBox(
-                      width: 60,
-                      child: TextField(
-                        controller: _notifValueController,
-                        keyboardType: TextInputType.number,
-                        textAlign: TextAlign.center,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
-                          LengthLimitingTextInputFormatter(
-                              3), // Máximo 3 dígitos
+                    Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 8.0,
+                      children: [
+                        const Text("Avisar "),
+                        SizedBox(
+                          width: 60,
+                          child: TextField(
+                            controller: _notifValueController,
+                            keyboardType: TextInputType.number,
+                            textAlign: TextAlign.center,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                              LengthLimitingTextInputFormatter(3)
+                            ],
+                          ),
+                        ),
+                        DropdownButton<String>(
+                          value: _notifUnit,
+                          items: _unitOptions
+                              .map((u) =>
+                                  DropdownMenuItem(value: u, child: Text(u)))
+                              .toList(),
+                          onChanged: (val) {
+                            setState(() {
+                              _notifUnit = val!;
+                            });
+                            _updateCalculations();
+                          },
+                        ),
+                        const Text(" antes."),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    if (_calculatedDate != null) ...{
+                      Row(
+                        children: [
+                          const Text("Recordar el: ",
+                              style: TextStyle(fontWeight: FontWeight.bold)),
+                          if (_showFlash) ...[
+                            Text(
+                              DateFormat('dd/MM/yyyy').format(_calculatedDate!),
+                              style: const TextStyle(
+                                color: Colors.red,
+                                decoration: TextDecoration.lineThrough,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const Icon(Icons.chevron_right,
+                                size: 16, color: Colors.grey),
+                            Text(
+                              todayStr,
+                              style: const TextStyle(
+                                  color: Colors.blue,
+                                  fontWeight: FontWeight.bold),
+                            ),
+                          ] else ...{
+                            Text(DateFormat('dd/MM/yyyy')
+                                .format(_calculatedDate!)),
+                          },
                         ],
                       ),
-                    ),
-                    DropdownButton<String>(
-                      value: _notifUnit,
-                      items: _unitOptions
-                          .map(
-                              (u) => DropdownMenuItem(value: u, child: Text(u)))
-                          .toList(),
-                      onChanged: (val) => setState(() => _notifUnit = val!),
-                    ),
-                    const Text(" antes."),
+                    },
                   ],
                 ),
               ),
+            },
             const SizedBox(height: 32),
             SizedBox(
               width: double.infinity,

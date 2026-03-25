@@ -11,6 +11,13 @@ enum DocFilter { all, upcoming, expired }
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
+  // Permite que el servicio de notificaciones active la búsqueda desde fuera
+  static void searchFromNotification(String itemName) {
+    _homeState?.activateFilterByName(itemName);
+  }
+
+  static _HomeScreenState? _homeState;
+
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
@@ -19,7 +26,6 @@ class _HomeScreenState extends State<HomeScreen> {
   List<FollowItem> _items = [];
   List<Map<String, dynamic>> _rawItems = [];
 
-  // Pila de navegación para gestionar niveles de carpetas y títulos
   final List<Map<String, String?>> _navigationStack = [
     {'id': null, 'name': 'Principal'}
   ];
@@ -31,15 +37,31 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    HomeScreen._homeState = this;
     _refreshItems();
   }
 
-  // Getter para obtener el nivel actual de la pila
+  @override
+  void dispose() {
+    if (HomeScreen._homeState == this) HomeScreen._homeState = null;
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  // Método para activar la búsqueda de un elemento específico
+  void activateFilterByName(String name) {
+    setState(() {
+      _isSearching = true;
+      _searchController.text = name;
+      _activeFilter = DocFilter.all; // Reseteamos filtros para que aparezca
+    });
+    _refreshItems();
+  }
+
   Map<String, String?> get _currentLevel => _navigationStack.last;
 
   Future<void> _refreshItems() async {
     final searchText = _searchController.text.trim();
-
     final List<Map<String, dynamic>> data =
         await DatabaseHelper.instance.getItems(
       parentId: _currentLevel['id'],
@@ -50,7 +72,6 @@ class _HomeScreenState extends State<HomeScreen> {
       _rawItems = data;
       _items = data.map((item) => FollowItem.fromMap(item)).toList();
 
-      // Lógica de filtrado por estado
       if (_activeFilter == DocFilter.expired) {
         _items = _items
             .where((i) => i.type == ItemType.document && i.isExpired)
@@ -79,43 +100,92 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Widget _buildFilterChips() {
-    return Container(
-      height: 50,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        children: [
-          FilterChip(
-            label: const Text("Todos"),
-            selected: _activeFilter == DocFilter.all,
-            onSelected: (val) {
-              setState(() => _activeFilter = DocFilter.all);
-              _refreshItems();
-            },
-          ),
-          const SizedBox(width: 8),
-          FilterChip(
-            label: const Text("Próximos (7d)"),
-            selected: _activeFilter == DocFilter.upcoming,
-            onSelected: (val) {
-              setState(() => _activeFilter = DocFilter.upcoming);
-              _refreshItems();
-            },
-          ),
-          const SizedBox(width: 8),
-          FilterChip(
-            label: const Text("Vencidos"),
-            selected: _activeFilter == DocFilter.expired,
-            selectedColor: Colors.red.shade100,
-            onSelected: (val) {
-              setState(() => _activeFilter = DocFilter.expired);
-              _refreshItems();
-            },
-          ),
-        ],
+  void _showItemDetails(FollowItem item, Map<String, dynamic> rawDoc) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  "${rawDoc['doc_type'] ?? 'Documento'}",
+                  style: TextStyle(
+                      color: Colors.blue.shade700, fontWeight: FontWeight.bold),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+            Text(
+              item.name,
+              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            if (item.expirationDate != null) ...[
+              const Text("Vencimiento:",
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold, color: Colors.grey)),
+              Text(
+                "${DateFormat('dd/MM/yyyy').format(item.expirationDate!)} (${item.expirationHint})",
+                style: TextStyle(
+                    fontSize: 18,
+                    color: item.isExpired ? Colors.red : Colors.black),
+              ),
+              const SizedBox(height: 12),
+            ],
+            const Text("Notificación programada:",
+                style:
+                    TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+            Text(
+              item.notifValue > 0
+                  ? "${item.notifValue} ${item.notifUnit} antes"
+                  : "Desactivada",
+              style: const TextStyle(fontSize: 18),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _editItem(item, rawDoc);
+                },
+                icon: const Icon(Icons.edit),
+                label: const Text("EDITAR"),
+              ),
+            ),
+          ],
+        ),
       ),
     );
+  }
+
+  Future<void> _editItem(FollowItem item, Map<String, dynamic> rawDoc) async {
+    if (item.type == ItemType.folder) {
+      _showFolderDialog(existingFolder: rawDoc);
+    } else {
+      final res = await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => AddDocumentScreen(
+            existingDoc: rawDoc,
+            parentId: rawDoc['parent_id'],
+          ),
+        ),
+      );
+      if (res == true) _refreshItems();
+    }
   }
 
   Widget _buildItemRow(FollowItem item) {
@@ -128,15 +198,17 @@ class _HomeScreenState extends State<HomeScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       child: Dismissible(
         key: Key(item.id),
+        // Cambiamos a endToStart (deslizar a la izquierda) para evitar
+        // conflicto con el gesto de "Atrás" de Android desde el borde derecho.
         direction: DismissDirection.endToStart,
         confirmDismiss: (direction) async {
+          // Re-insertamos la pregunta de seguridad que protege contra borrados accidentales
           return await showDialog(
             context: context,
             builder: (BuildContext context) {
               return AlertDialog(
                 title: const Text("Confirmar eliminación"),
-                content: Text(
-                    "¿Deseas borrar '${item.name}'? Esta acción no se puede deshacer."),
+                content: Text("¿Deseas borrar '${item.name}'?"),
                 actions: [
                   TextButton(
                     onPressed: () => Navigator.of(context).pop(false),
@@ -152,18 +224,17 @@ class _HomeScreenState extends State<HomeScreen> {
             },
           );
         },
-        background: Container(
-          decoration: BoxDecoration(
-              color: Colors.red.shade400,
-              borderRadius: BorderRadius.circular(12)),
-          alignment: Alignment.centerRight,
-          padding: const EdgeInsets.only(right: 20),
-          child: const Icon(Icons.delete_sweep, color: Colors.white, size: 28),
-        ),
         onDismissed: (_) async {
           await DatabaseHelper.instance.deleteItem(item.id);
           _refreshItems();
         },
+        background: Container(
+          decoration: BoxDecoration(
+              color: Colors.red, borderRadius: BorderRadius.circular(12)),
+          alignment: Alignment.centerRight,
+          padding: const EdgeInsets.only(right: 20),
+          child: const Icon(Icons.delete, color: Colors.white),
+        ),
         child: Card(
           child: ListTile(
             leading: CircleAvatar(
@@ -190,7 +261,16 @@ class _HomeScreenState extends State<HomeScreen> {
                     style: TextStyle(
                         color:
                             item.isExpired ? Colors.red : Colors.grey.shade600))
-                : const Text("Carpeta"),
+                : FutureBuilder<List<Map<String, dynamic>>>(
+                    future: DatabaseHelper.instance.getItems(parentId: item.id),
+                    builder: (context, snapshot) {
+                      if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                        return const Text("Sin documentos");
+                      }
+                      final count = snapshot.data!.length;
+                      return Text("$count documento${count > 1 ? 's' : ''}");
+                    },
+                  ),
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -201,33 +281,31 @@ class _HomeScreenState extends State<HomeScreen> {
                           ? Icons.notifications_active
                           : Icons.notifications_off,
                       color: item.notifValue > 0 ? Colors.blue : Colors.grey,
-                      size: 22,
                     ),
                     onPressed: () async {
-                      await NotificationService()
-                          .showInstantNotification(item.name);
+                      if (item.notifValue > 0 && item.expirationDate != null) {
+                        int days = item.notifValue;
+                        if (item.notifUnit == 'Semanas') days *= 7;
+                        if (item.notifUnit == 'Meses') days *= 30;
+
+                        final reminderDate =
+                            item.expirationDate!.subtract(Duration(days: days));
+                        final dateStr = DateFormat('dd/MM/yyyy')
+                            .format(item.expirationDate!);
+                        final reminderStr =
+                            DateFormat('dd/MM/yyyy').format(reminderDate);
+
+                        await NotificationService().showInstantNotification(
+                          title:
+                              "${rawDoc['doc_type'] ?? 'Documento'}: ${item.name}",
+                          body:
+                              "Renovar ${item.name} antes del $dateStr. Te lo recordaré el $reminderStr.",
+                          payload: item.name,
+                        );
+                      }
                     },
                   ),
-                IconButton(
-                  icon: const Icon(Icons.edit_note),
-                  onPressed: () async {
-                    // Si es carpeta, abrir el diálogo de carpeta. Si no, la pantalla de documento.
-                    if (item.type == ItemType.folder) {
-                      _showFolderDialog(existingFolder: rawDoc);
-                    } else {
-                      final res = await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => AddDocumentScreen(
-                            existingDoc: rawDoc,
-                            parentId: rawDoc['parent_id'],
-                          ),
-                        ),
-                      );
-                      if (res == true) _refreshItems();
-                    }
-                  },
-                ),
+                const Icon(Icons.chevron_right, color: Colors.grey),
               ],
             ),
             onTap: () {
@@ -237,6 +315,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   _activeFilter = DocFilter.all;
                 });
                 _refreshItems();
+              } else {
+                _showItemDetails(item, rawDoc);
               }
             },
           ),
@@ -255,11 +335,9 @@ class _HomeScreenState extends State<HomeScreen> {
             Text(existingFolder == null ? "Nueva Carpeta" : "Editar Carpeta"),
         content: TextField(
           controller: folderController,
-          maxLength: 32, // Límite de 32 caracteres para carpetas
+          maxLength: 32,
           decoration: const InputDecoration(
-            labelText: "Nombre de la carpeta",
-            counterText: "",
-          ),
+              labelText: "Nombre de la carpeta", counterText: ""),
         ),
         actions: [
           TextButton(
@@ -268,29 +346,24 @@ class _HomeScreenState extends State<HomeScreen> {
           ElevatedButton(
             onPressed: () async {
               if (folderController.text.trim().isNotEmpty) {
+                final data = {
+                  'id': existingFolder?['id'] ?? const Uuid().v4(),
+                  'name': folderController.text.trim(),
+                  'type': 'folder',
+                  'is_active': 1,
+                  'parent_id': _currentLevel['id'],
+                };
                 if (existingFolder == null) {
-                  await DatabaseHelper.instance.insertItem({
-                    'id': const Uuid().v4(),
-                    'name': folderController.text.trim(),
-                    'type': 'folder',
-                    'is_active': 1,
-                    'parent_id': _currentLevel['id'],
-                  });
+                  await DatabaseHelper.instance.insertItem(data);
                 } else {
-                  await DatabaseHelper.instance.updateItem({
-                    'id': existingFolder['id'],
-                    'name': folderController.text.trim(),
-                    'type': 'folder',
-                    'is_active': 1,
-                    'parent_id': existingFolder['parent_id'],
-                  });
+                  await DatabaseHelper.instance.updateItem(data);
                 }
-                if (!context.mounted) return;
-                Navigator.pop(context);
+                // ignore: use_build_context_synchronously
+                if (mounted) Navigator.pop(context);
                 _refreshItems();
               }
             },
-            child: Text(existingFolder == null ? "Crear" : "Guardar"),
+            child: const Text("Guardar"),
           ),
         ],
       ),
@@ -319,12 +392,43 @@ class _HomeScreenState extends State<HomeScreen> {
               final res = await Navigator.push(
                   context,
                   MaterialPageRoute(
-                      builder: (_) => AddDocumentScreen(
-                            parentId: _currentLevel['id'],
-                          )));
+                      builder: (_) =>
+                          AddDocumentScreen(parentId: _currentLevel['id'])));
               if (res == true) _refreshItems();
             },
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterChips() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          FilterChip(
+              label: const Text("Todos"),
+              selected: _activeFilter == DocFilter.all,
+              onSelected: (_) {
+                setState(() => _activeFilter = DocFilter.all);
+                _refreshItems();
+              }),
+          FilterChip(
+              label: const Text("Próximos"),
+              selected: _activeFilter == DocFilter.upcoming,
+              onSelected: (_) {
+                setState(() => _activeFilter = DocFilter.upcoming);
+                _refreshItems();
+              }),
+          FilterChip(
+              label: const Text("Vencidos"),
+              selected: _activeFilter == DocFilter.expired,
+              onSelected: (_) {
+                setState(() => _activeFilter = DocFilter.expired);
+                _refreshItems();
+              }),
         ],
       ),
     );
@@ -334,9 +438,8 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return PopScope(
       canPop: _navigationStack.length <= 1,
-      onPopInvokedWithResult: (didPop, result) {
-        if (didPop) return;
-        _goBack();
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _goBack();
       },
       child: Scaffold(
         appBar: AppBar(
@@ -344,15 +447,12 @@ class _HomeScreenState extends State<HomeScreen> {
               ? TextField(
                   controller: _searchController,
                   autofocus: true,
-                  maxLength: 64, // Límite de 64 caracteres en búsqueda
-                  style: const TextStyle(color: Colors.black, fontSize: 18),
+                  maxLength: 64,
                   decoration: const InputDecoration(
-                    hintText: "Buscar documento...",
-                    hintStyle: TextStyle(color: Colors.black54),
-                    border: InputBorder.none,
-                    counterText: "",
-                  ),
-                  onChanged: (q) => _refreshItems(),
+                      hintText: "Buscar...",
+                      border: InputBorder.none,
+                      counterText: ""),
+                  onChanged: (_) => _refreshItems(),
                 )
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -381,6 +481,7 @@ class _HomeScreenState extends State<HomeScreen> {
               child: RefreshIndicator(
                 onRefresh: _refreshItems,
                 child: ListView.builder(
+                  padding: const EdgeInsets.only(bottom: 100),
                   itemCount: _items.length,
                   itemBuilder: (context, index) => _buildItemRow(_items[index]),
                 ),
