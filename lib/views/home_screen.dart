@@ -25,6 +25,13 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   List<FollowItem> _items = [];
   List<Map<String, dynamic>> _rawItems = [];
+  // Variables de estado para Configuración (ya no son valores hardcode) [cite: 121]
+  int _defaultNotifValue = 7;
+  String _defaultNotifUnit = 'Días';
+  bool _globalNotificationsEnabled = true;
+  TimeOfDay _notificationTime = const TimeOfDay(hour: 8, minute: 0);
+  String _selectedLanguage = 'Español';
+  String _dateFormat = 'dd/MM/yyyy';
 
   final List<Map<String, String?>> _navigationStack = [
     {'id': null, 'name': 'Principal'}
@@ -402,35 +409,190 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+// Implementación del Panel de Configuración [cite: 121]
   void _showConfigPanel() {
     showModalBottomSheet(
       context: context,
-      builder: (context) => const Padding(
-        padding: EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text("Configuración",
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            SizedBox(height: 16),
-            Text("Opciones del sistema aparecerán aquí."),
-          ],
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setPanelState) => Container(
+          height: MediaQuery.of(context).size.height * 0.85,
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              // Título con Chevrón para regresar [cite: 121]
+              AppBar(
+                leading: IconButton(
+                  icon: const Icon(Icons.chevron_left),
+                  onPressed: () => Navigator.pop(context),
+                ),
+                title: const Text("Configuración"),
+                backgroundColor: Colors.transparent,
+                elevation: 0,
+                foregroundColor: Colors.black,
+              ),
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    // Subtítulo: Recordatorio [cite: 121]
+                    const Text("Recordatorio",
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 16)),
+                    ListTile(
+                      title: const Text("Cantidad de días por defecto"),
+                      trailing: SizedBox(
+                        width: 50,
+                        child: TextField(
+                          keyboardType: TextInputType.number,
+                          textAlign: TextAlign.center,
+                          onChanged: (val) {
+                            _defaultNotifValue = int.tryParse(val) ?? 7;
+                          },
+                          controller: TextEditingController(
+                              text: _defaultNotifValue.toString()),
+                        ),
+                      ),
+                    ),
+                    ListTile(
+                      title: const Text("Tipo de lapso"),
+                      trailing: DropdownButton<String>(
+                        value: _defaultNotifUnit,
+                        items: ['Días', 'Semanas', 'Meses']
+                            .map((u) =>
+                                DropdownMenuItem(value: u, child: Text(u)))
+                            .toList(),
+                        onChanged: (val) {
+                          setPanelState(() => _defaultNotifUnit = val!);
+                        },
+                      ),
+                    ),
+                    const Divider(),
+
+                    // Subtítulo: Notificaciones [cite: 121]
+                    const Text("Notificaciones",
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 16)),
+                    SwitchListTile(
+                      secondary: Icon(_globalNotificationsEnabled
+                          ? Icons.notifications_active
+                          : Icons.notifications_off),
+                      title: const Text("Activar notificaciones"),
+                      value: _globalNotificationsEnabled,
+                      onChanged: (val) {
+                        setPanelState(() => _globalNotificationsEnabled = val);
+                      },
+                    ),
+                    ListTile(
+                      title: const Text("Probar notificaciones"),
+                      trailing: ElevatedButton(
+                        onPressed: _globalNotificationsEnabled
+                            ? () {
+                                Future.delayed(
+                                    const Duration(milliseconds: 500), () {
+                                  NotificationService().showInstantNotification(
+                                    title: "Prueba de Sistema",
+                                    body:
+                                        "Las notificaciones están configuradas correctamente.",
+                                  );
+                                });
+                              }
+                            : null, // Deshabilitado si están inactivas [cite: 121]
+                        child: const Text("Probar"),
+                      ),
+                    ),
+                    ListTile(
+                      title: const Text("Hora de presentación"),
+                      trailing: TextButton(
+                        child: Text(_notificationTime.format(context)),
+                        onPressed: () async {
+                          final picked = await showTimePicker(
+                              context: context, initialTime: _notificationTime);
+                          if (picked != null) {
+                            setPanelState(() => _notificationTime = picked);
+                          }
+                        },
+                      ),
+                    ),
+                    const Divider(),
+
+                    // Subtítulo: Respaldos [cite: 121]
+                    const Text("Respaldos",
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 16)),
+                    Row(
+                      children: [
+                        Expanded(
+                            child: ElevatedButton(
+                                onPressed: () {},
+                                child: const Text("Hacer respaldo"))),
+                        const SizedBox(width: 8),
+                        Expanded(
+                            child: OutlinedButton(
+                                onPressed: () {},
+                                child: const Text("Recuperar"))),
+                      ],
+                    ),
+                    const Divider(),
+
+                    // Subtítulo: Configuración regional [cite: 121]
+                    const Text("Configuración regional",
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 16)),
+                    ListTile(
+                      title: const Text("Idioma"),
+                      trailing: DropdownButton<String>(
+                        value: _selectedLanguage,
+                        items: ['Español', 'Inglés']
+                            .map((l) =>
+                                DropdownMenuItem(value: l, child: Text(l)))
+                            .toList(),
+                        onChanged: (val) =>
+                            setPanelState(() => _selectedLanguage = val!),
+                      ),
+                    ),
+                    Text("Zona horaria: ${DateTime.now().timeZoneName}"),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
   void _showAboutPanel() {
-    showAboutDialog(
+    showModalBottomSheet(
       context: context,
-      applicationName: 'Follow Docs',
-      applicationVersion: '1.0.0',
-      applicationIcon:
-          const Icon(Icons.description, size: 50, color: Colors.blue),
-      children: const [
-        Text(
-            "Aplicación diseñada para la gestión y seguimiento de documentos."),
-      ],
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (context) => Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.description, size: 64, color: Colors.blue),
+            const SizedBox(height: 16),
+            const Text("Follow Docs",
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+            const Text("Versión 1.0.0", style: TextStyle(color: Colors.grey)),
+            const SizedBox(height: 16),
+            const Text(
+              "Aplicación diseñada para la gestión y seguimiento de documentos con vencimiento.",
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            const Text("Desarrollado por: Intesys LLC, 2026",
+                style: TextStyle(fontWeight: FontWeight.w500)),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
     );
   }
 
