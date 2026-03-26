@@ -402,6 +402,38 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void _showConfigPanel() {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => const Padding(
+        padding: EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text("Configuración",
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            SizedBox(height: 16),
+            Text("Opciones del sistema aparecerán aquí."),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showAboutPanel() {
+    showAboutDialog(
+      context: context,
+      applicationName: 'Follow Docs',
+      applicationVersion: '1.0.0',
+      applicationIcon:
+          const Icon(Icons.description, size: 50, color: Colors.blue),
+      children: const [
+        Text(
+            "Aplicación diseñada para la gestión y seguimiento de documentos."),
+      ],
+    );
+  }
+
   Widget _buildFilterChips() {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -489,9 +521,57 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ],
         ),
-        floatingActionButton: FloatingActionButton(
-          onPressed: () => _showCreateOptions(),
-          child: const Icon(Icons.add),
+        drawer: Drawer(
+          child: ListView(
+            padding: EdgeInsets.zero,
+            children: [
+              const DrawerHeader(
+                decoration: BoxDecoration(color: Colors.blue),
+                child: Text('Menú Principal',
+                    style: TextStyle(color: Colors.white, fontSize: 24)),
+              ),
+              ListTile(
+                leading: const Icon(Icons.create_new_folder),
+                title: const Text('Carpeta'),
+                onTap: () {
+                  Navigator.pop(context); // Cierra el drawer
+                  _showFolderDialog(); // Reutiliza la acción existente [cite: 122]
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.description),
+                title: const Text('Documento'),
+                onTap: () async {
+                  Navigator.pop(context);
+                  final res = await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) =>
+                            AddDocumentScreen(parentId: _currentLevel['id'])),
+                  );
+                  if (res == true)
+                    _refreshItems(); // Reutiliza la acción existente [cite: 122]
+                },
+              ),
+              const Divider(), // Espacio de separación [cite: 121]
+              ListTile(
+                leading: const Icon(Icons.settings),
+                title: const Text('Configuración'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showConfigPanel(); // Nuevo panel
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.info),
+                title: const Text('Acerca de'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showAboutPanel(); // Nuevo panel
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );
